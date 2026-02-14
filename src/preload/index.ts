@@ -1,0 +1,43 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { electronAPI } from '@electron-toolkit/preload'
+
+const api = {
+  platform: process.platform as string,
+  getState: (): Promise<unknown> => ipcRenderer.invoke('store:get-state'),
+  saveGroups: (groups: unknown): Promise<void> => ipcRenderer.invoke('store:save-groups', groups),
+  saveActiveTab: (tabId: string | null): Promise<void> =>
+    ipcRenderer.invoke('store:save-active-tab', tabId),
+  saveGroupsAndActiveTab: (groups: unknown, activeTabId: string | null): Promise<void> =>
+    ipcRenderer.invoke('store:save-groups-and-active-tab', groups, activeTabId),
+  saveSidebarState: (expanded: boolean): Promise<void> =>
+    ipcRenderer.invoke('store:save-sidebar-state', expanded),
+  saveOpenLinksInNewTab: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('store:save-open-links-in-new-tab', value),
+  clearGroupSession: (groupId: string): Promise<void> =>
+    ipcRenderer.invoke('store:clear-group-session', groupId),
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
+  exportConfig: (): Promise<string | null> => ipcRenderer.invoke('dialog:export-config'),
+  importConfig: (): Promise<unknown | null> => ipcRenderer.invoke('dialog:import-config'),
+  onOpenInNewTab: (callback: (url: string) => void): void => {
+    ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
+      callback(url)
+    })
+  },
+  removeOpenInNewTabListener: (): void => {
+    ipcRenderer.removeAllListeners('webview-context:open-in-new-tab')
+  }
+}
+
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('api', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
+  // @ts-ignore (define in dts)
+  window.api = api
+}
