@@ -42,5 +42,3 @@ publish:
   provider: github
   owner: silo
   repo: silo-browser
-electronDownload:
-  mirror: https://npmmirror.com/mirrors/electron/
