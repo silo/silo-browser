@@ -24,22 +24,16 @@ esac
 echo ""
 echo "New version: $VERSION"
 echo ""
-echo "Write release notes (press Enter twice to finish):"
-NOTES=""
-EMPTY=0
-while IFS= read -r LINE; do
-  if [ -z "$LINE" ]; then
-    EMPTY=$((EMPTY + 1))
-    if [ $EMPTY -ge 2 ]; then
-      break
-    fi
-    NOTES="$NOTES"$'\n'
-  else
-    EMPTY=0
-    NOTES="$NOTES$LINE"$'\n'
-  fi
-done
-NOTES=$(echo "$NOTES" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+TMPFILE=$(mktemp)
+echo "# Write release notes below. Save and close the editor to continue." > "$TMPFILE"
+${EDITOR:-nano} "$TMPFILE"
+NOTES=$(grep -v '^#' "$TMPFILE" | sed -e '/^$/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+rm -f "$TMPFILE"
+
+if [ -z "$NOTES" ]; then
+  echo "No release notes provided. Aborted."
+  exit 1
+fi
 
 echo ""
 echo "--- Release Summary ---"
@@ -89,3 +83,4 @@ git push && git push --tags
 
 echo ""
 echo "Released v$VERSION — GitHub Actions will now build and publish the release."
+exit 0

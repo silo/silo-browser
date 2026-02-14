@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ${{ matrix.os }}
@@ -30,10 +33,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Install snapcraft (Linux only)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo snap install snapcraft --classic
 
       - name: Build and publish
         env:
