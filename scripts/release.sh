@@ -48,32 +48,8 @@ if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
   exit 0
 fi
 
-# Bump version first
+# Bump version
 pnpm pkg set version="$VERSION"
-
-# Build with the new version
-echo ""
-echo "=== Building v$VERSION for all platforms ==="
-echo ""
-
-echo "Running typecheck and build..."
-pnpm build
-echo ""
-
-echo "Packaging macOS..."
-pnpm exec electron-builder --mac --publish never
-echo ""
-
-echo "Packaging Windows..."
-pnpm exec electron-builder --win --publish never
-echo ""
-
-echo "Packaging Linux..."
-pnpm exec electron-builder --linux --publish never
-echo ""
-
-echo "=== All builds succeeded ==="
-echo ""
 
 # Commit and tag with release notes
 git add -A
