@@ -97,6 +97,17 @@ export const useUiStore = defineStore('ui', () => {
     settingsDialogOpen.value = false
   }
 
+  // --- Update dialog ---
+  const updateDialogOpen = ref(false)
+  const updateVersion = ref<string | null>(null)
+  function showUpdateDialog(version: string): void {
+    updateVersion.value = version
+    updateDialogOpen.value = true
+  }
+  function closeUpdateDialog(): void {
+    updateDialogOpen.value = false
+  }
+
   async function loadFromDisk(): Promise<void> {
     const state = await window.api.getState()
     sidebarExpanded.value = state.sidebarExpanded ?? true
@@ -135,6 +146,10 @@ export const useUiStore = defineStore('ui', () => {
     settingsDialogOpen,
     openSettingsDialog,
     closeSettingsDialog,
+    updateDialogOpen,
+    updateVersion,
+    showUpdateDialog,
+    closeUpdateDialog,
     loadFromDisk
   }
 })

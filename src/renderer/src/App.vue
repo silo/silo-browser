@@ -11,6 +11,7 @@ import AddTabDialog from '@renderer/components/dialogs/AddTabDialog.vue'
 import EditGroupDialog from '@renderer/components/dialogs/EditGroupDialog.vue'
 import EditTabDialog from '@renderer/components/dialogs/EditTabDialog.vue'
 import SettingsDialog from '@renderer/components/dialogs/SettingsDialog.vue'
+import UpdateDialog from '@renderer/components/dialogs/UpdateDialog.vue'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
@@ -27,11 +28,17 @@ onMounted(async () => {
       topbarStore.addChildTab(activeTab.id, activeTab.groupId, url)
     }
   })
+
+  // Listen for auto-updater
+  window.api.onUpdateDownloaded((version: string) => {
+    uiStore.showUpdateDialog(version)
+  })
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.api.removeOpenInNewTabListener()
+  window.api.removeUpdateDownloadedListener()
 })
 
 function handleKeydown(e: KeyboardEvent): void {
@@ -130,4 +137,5 @@ function handleKeydown(e: KeyboardEvent): void {
   <EditGroupDialog />
   <EditTabDialog />
   <SettingsDialog />
+  <UpdateDialog />
 </template>

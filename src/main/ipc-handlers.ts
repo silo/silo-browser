@@ -1,6 +1,7 @@
 import { ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
+import { autoUpdater } from 'electron-updater'
 import { loadState, saveState } from './store'
 
 export function registerIpcHandlers(): void {
@@ -39,6 +40,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('shell:open-external', async (_event, url: string) => {
     await shell.openExternal(url)
+  })
+
+  ipcMain.handle('updater:quit-and-install', () => {
+    autoUpdater.quitAndInstall()
   })
 
   ipcMain.handle('dialog:export-config', async () => {

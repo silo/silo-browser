@@ -25,7 +25,16 @@ const api = {
   },
   removeOpenInNewTabListener: (): void => {
     ipcRenderer.removeAllListeners('webview-context:open-in-new-tab')
-  }
+  },
+  onUpdateDownloaded: (callback: (version: string) => void): void => {
+    ipcRenderer.on('updater:update-downloaded', (_event, version: string) => {
+      callback(version)
+    })
+  },
+  removeUpdateDownloadedListener: (): void => {
+    ipcRenderer.removeAllListeners('updater:update-downloaded')
+  },
+  quitAndInstall: (): Promise<void> => ipcRenderer.invoke('updater:quit-and-install')
 }
 
 if (process.contextIsolated) {

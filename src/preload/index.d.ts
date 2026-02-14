@@ -15,6 +15,9 @@ export interface SiloApi {
   importConfig: () => Promise<unknown | null>
   onOpenInNewTab: (callback: (url: string) => void) => void
   removeOpenInNewTabListener: () => void
+  onUpdateDownloaded: (callback: (version: string) => void) => void
+  removeUpdateDownloadedListener: () => void
+  quitAndInstall: () => Promise<void>
 }
 
 declare global {

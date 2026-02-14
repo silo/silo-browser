@@ -1,11 +1,12 @@
 import { app, shell, BrowserWindow, Menu, MenuItem, clipboard } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
 import { getCachedState } from './store'
 import icon from '../../resources/icon.png?asset'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -39,6 +40,23 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
+}
+
+function initAutoUpdater(mainWindow: BrowserWindow): void {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow.webContents.send('updater:update-downloaded', info.version)
+  })
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err)
+  })
+
+  autoUpdater.checkForUpdates()
 }
 
 // Intercept webview context menus and new-window requests
@@ -140,7 +158,8 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
-  createWindow()
+  const mainWindow = createWindow()
+  initAutoUpdater(mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
