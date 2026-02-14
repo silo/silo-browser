@@ -1,10 +1,14 @@
-import { ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
+import { app, ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { autoUpdater } from 'electron-updater'
 import { loadState, saveState } from './store'
 
 export function registerIpcHandlers(): void {
+  ipcMain.handle('app:get-version', () => {
+    return app.getVersion()
+  })
+
   ipcMain.handle('store:get-state', () => {
     return loadState()
   })

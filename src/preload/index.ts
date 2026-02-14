@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 const api = {
   platform: process.platform as string,
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
   getState: (): Promise<unknown> => ipcRenderer.invoke('store:get-state'),
   saveGroups: (groups: unknown): Promise<void> => ipcRenderer.invoke('store:save-groups', groups),
   saveActiveTab: (tabId: string | null): Promise<void> =>

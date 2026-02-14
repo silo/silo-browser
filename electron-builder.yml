@@ -1,5 +1,5 @@
 appId: com.electron.app
-productName: silo-browser
+productName: Silo
 directories:
   buildResources: build
 files:

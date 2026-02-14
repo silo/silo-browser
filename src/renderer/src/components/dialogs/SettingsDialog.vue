@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
+const appVersion = ref('')
+
+onMounted(async () => {
+  appVersion.value = await window.api.getAppVersion()
+})
 
 async function handleImport(): Promise<void> {
   const result = await window.api.importConfig()
@@ -137,7 +143,7 @@ function close(): void {
             >
               About
             </h3>
-            <p class="text-sm text-gray-500">Silo Browser v1.0.0</p>
+            <p class="text-sm text-gray-500">Silo v{{ appVersion }}</p>
           </div>
         </div>
       </div>
