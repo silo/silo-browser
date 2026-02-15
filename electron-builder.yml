@@ -2,6 +2,9 @@ appId: com.electron.app
 productName: Silo
 directories:
   buildResources: build
+electronLanguages:
+  - en-US
+compression: maximum
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -9,6 +12,9 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{CLAUDE.md,.gitignore,.editorconfig}'
+  - '!scripts/*'
+  - '!**/*.map'
 asarUnpack:
   - resources/**
 win:
