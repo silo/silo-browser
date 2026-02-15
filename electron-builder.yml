@@ -1,4 +1,4 @@
-appId: com.electron.app
+appId: com.silo-browser.app
 productName: Silo
 directories:
   buildResources: build
@@ -25,7 +25,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  identity: "-"
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
