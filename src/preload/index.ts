@@ -14,6 +14,8 @@ const api = {
     ipcRenderer.invoke('store:save-sidebar-state', expanded),
   saveOpenLinksInNewTab: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('store:save-open-links-in-new-tab', value),
+  saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null): Promise<void> =>
+    ipcRenderer.invoke('store:save-child-tabs', childTabs, activeChildTabId),
   clearGroupSession: (groupId: string): Promise<void> =>
     ipcRenderer.invoke('store:clear-group-session', groupId),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),

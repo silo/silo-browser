@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 import { useGroupsStore } from './groups'
 import type { ChildTab } from '@renderer/types'
 
@@ -27,6 +27,58 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
 
   const isChildActive = computed(() => activeTopbarTabId.value !== null)
 
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null
+
+  function debouncedSave(): void {
+    if (saveTimeout) clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(() => {
+      const raw = childTabs.value.map((ct) => {
+        const rawChild = toRaw(ct)
+        return {
+          id: rawChild.id,
+          parentTabId: rawChild.parentTabId,
+          groupId: rawChild.groupId,
+          url: rawChild.url
+        }
+      })
+      window.api.saveChildTabs(raw, activeChildTabId.value)
+    }, 500)
+  }
+
+  async function loadFromDisk(): Promise<void> {
+    const state = await window.api.getState()
+    const loadedChildTabs = (state.childTabs ?? []) as ChildTab[]
+
+    const validTabIds = new Set<string>()
+    const validGroupIds = new Set<string>()
+    for (const group of (state.groups ?? []) as { id: string; tabs: { id: string }[] }[]) {
+      validGroupIds.add(group.id)
+      for (const tab of group.tabs ?? []) {
+        validTabIds.add(tab.id)
+      }
+    }
+
+    childTabs.value = loadedChildTabs
+      .filter((ct) => validTabIds.has(ct.parentTabId) && validGroupIds.has(ct.groupId))
+      .map((ct) => ({
+        id: ct.id,
+        parentTabId: ct.parentTabId,
+        groupId: ct.groupId,
+        url: ct.url,
+        currentUrl: ct.url,
+        currentTitle: undefined,
+        iconUrl: undefined,
+        isAudioPlaying: false
+      }))
+
+    const restoredActiveId = state.activeChildTabId ?? null
+    if (restoredActiveId && childTabs.value.find((ct) => ct.id === restoredActiveId)) {
+      activeChildTabId.value = restoredActiveId
+    } else {
+      activeChildTabId.value = null
+    }
+  }
+
   function addChildTab(parentTabId: string, groupId: string, url: string): ChildTab {
     const child: ChildTab = {
       id: crypto.randomUUID(),
@@ -37,6 +89,7 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     }
     childTabs.value.push(child)
     activeChildTabId.value = child.id
+    debouncedSave()
     return child
   }
 
@@ -50,6 +103,7 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
       const siblings = childTabs.value.filter((ct) => ct.parentTabId === removed.parentTabId)
       activeChildTabId.value = siblings.length > 0 ? siblings[siblings.length - 1].id : null
     }
+    debouncedSave()
   }
 
   function removeAllChildTabs(parentTabId: string): void {
@@ -58,14 +112,17 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
       const stillExists = childTabs.value.find((ct) => ct.id === activeChildTabId.value)
       if (!stillExists) activeChildTabId.value = null
     }
+    debouncedSave()
   }
 
   function activateMainTab(): void {
     activeChildTabId.value = null
+    debouncedSave()
   }
 
   function activateChildTab(childId: string): void {
     activeChildTabId.value = childId
+    debouncedSave()
   }
 
   function setChildCurrentUrl(childId: string, url: string): void {
@@ -98,6 +155,7 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     currentChildTabs,
     activeTopbarTabId,
     isChildActive,
+    loadFromDisk,
     addChildTab,
     removeChildTab,
     removeAllChildTabs,

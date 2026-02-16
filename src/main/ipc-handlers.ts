@@ -36,6 +36,13 @@ export function registerIpcHandlers(): void {
     await saveState({ openLinksInNewTab: value })
   })
 
+  ipcMain.handle(
+    'store:save-child-tabs',
+    async (_event, childTabs: unknown[], activeChildTabId: string | null) => {
+      await saveState({ childTabs, activeChildTabId })
+    }
+  )
+
   ipcMain.handle('store:clear-group-session', async (_event, groupId: string) => {
     const partition = `persist:silo-group-${groupId}`
     const ses = session.fromPartition(partition)
@@ -77,7 +84,10 @@ export function registerIpcHandlers(): void {
       const raw = readFileSync(result.filePaths[0], 'utf-8')
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.groups)) {
-        await saveState({ groups: parsed.groups })
+        const childTabs = Array.isArray(parsed.childTabs) ? parsed.childTabs : []
+        const activeChildTabId =
+          typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null
+        await saveState({ groups: parsed.groups, childTabs, activeChildTabId })
         return parsed
       }
       return null

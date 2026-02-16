@@ -40,6 +40,8 @@ export interface AppState {
   activeTabId: string | null
   sidebarExpanded: boolean
   openLinksInNewTab: boolean
+  childTabs: ChildTab[]
+  activeChildTabId: string | null
 }
 
 export interface ContextMenuItem {

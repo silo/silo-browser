@@ -19,6 +19,7 @@ const topbarStore = useTopbarTabsStore()
 
 onMounted(async () => {
   await Promise.all([groupsStore.loadFromDisk(), uiStore.loadFromDisk()])
+  await topbarStore.loadFromDisk()
   window.addEventListener('keydown', handleKeydown)
 
   // Listen for "Open in New Tab" from webview context menu

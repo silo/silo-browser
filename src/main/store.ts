@@ -8,13 +8,17 @@ export interface PersistedState {
   activeTabId: string | null
   sidebarExpanded: boolean
   openLinksInNewTab: boolean
+  childTabs: unknown[]
+  activeChildTabId: string | null
 }
 
 const defaultState: PersistedState = {
   groups: [],
   activeTabId: null,
   sidebarExpanded: true,
-  openLinksInNewTab: true
+  openLinksInNewTab: true,
+  childTabs: [],
+  activeChildTabId: null
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -35,7 +39,10 @@ export function loadState(): PersistedState {
       sidebarExpanded:
         typeof parsed.sidebarExpanded === 'boolean' ? parsed.sidebarExpanded : true,
       openLinksInNewTab:
-        typeof parsed.openLinksInNewTab === 'boolean' ? parsed.openLinksInNewTab : true
+        typeof parsed.openLinksInNewTab === 'boolean' ? parsed.openLinksInNewTab : true,
+      childTabs: Array.isArray(parsed.childTabs) ? parsed.childTabs : [],
+      activeChildTabId:
+        typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null
     }
     cachedState = { ...state }
     return state

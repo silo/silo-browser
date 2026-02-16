@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
+const topbarStore = useTopbarTabsStore()
 const appVersion = ref('')
 
 onMounted(async () => {
@@ -15,6 +17,7 @@ async function handleImport(): Promise<void> {
   const result = await window.api.importConfig()
   if (result) {
     await groupsStore.loadFromDisk()
+    await topbarStore.loadFromDisk()
     close()
   }
 }

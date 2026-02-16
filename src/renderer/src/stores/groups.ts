@@ -283,6 +283,11 @@ export const useGroupsStore = defineStore('groups', () => {
         tab.notificationsEnabled = tab.notificationsEnabled ?? true
       }
     }
+    // Mark the active tab as loaded so its webview renders on startup
+    if (activeTabId.value) {
+      const activeTab = findTab(activeTabId.value)
+      if (activeTab) activeTab.isLoaded = true
+    }
   }
 
   return {

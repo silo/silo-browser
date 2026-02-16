@@ -10,6 +10,7 @@ export interface SiloApi {
   saveGroupsAndActiveTab: (groups: unknown, activeTabId: string | null) => Promise<void>
   saveSidebarState: (expanded: boolean) => Promise<void>
   saveOpenLinksInNewTab: (value: boolean) => Promise<void>
+  saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null) => Promise<void>
   clearGroupSession: (groupId: string) => Promise<void>
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>
