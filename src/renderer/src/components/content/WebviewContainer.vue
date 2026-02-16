@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import type { TabItem } from '@renderer/types'
 
@@ -58,6 +58,52 @@ const handleMediaPaused = (() => {
   groupsStore.setTabAudioPlaying(props.tab.id, false)
 }) as EventListener
 
+function setNotifEnabled(enabled: boolean): void {
+  const wv = webviewRef.value
+  if (!wv) return
+  wv.executeJavaScript(`window.__siloNotifEnabled = ${enabled}`).catch(() => {})
+}
+
+const handleDomReady = (() => {
+  const wv = webviewRef.value
+  if (!wv) return
+  const enabled = props.tab.notificationsEnabled
+  // Wrap Notification API: always grant permission at the JS level,
+  // but intercept construction based on our enable/disable flag.
+  wv.executeJavaScript(`
+    (() => {
+      if (window.__siloNotifWrapped) return;
+      window.__siloNotifEnabled = ${enabled};
+      const OrigNotification = window.Notification;
+      const SiloNotification = function(title, options) {
+        if (!window.__siloNotifEnabled) return {};
+        return new OrigNotification(title, options);
+      };
+      SiloNotification.requestPermission = () => {
+        return OrigNotification.requestPermission.call(OrigNotification);
+      };
+      Object.defineProperty(SiloNotification, 'permission', {
+        get: () => OrigNotification.permission
+      });
+      SiloNotification.prototype = OrigNotification.prototype;
+      window.Notification = SiloNotification;
+      const origShow = ServiceWorkerRegistration.prototype.showNotification;
+      ServiceWorkerRegistration.prototype.showNotification = function(...args) {
+        if (!window.__siloNotifEnabled) return Promise.resolve();
+        return origShow.apply(this, args);
+      };
+      window.__siloNotifWrapped = true;
+    })()
+  `).catch(() => {})
+}) as EventListener
+
+watch(
+  () => props.tab.notificationsEnabled,
+  (enabled) => {
+    setNotifEnabled(enabled)
+  }
+)
+
 onMounted(() => {
   const wv = webviewRef.value
   if (!wv) return
@@ -70,6 +116,7 @@ onMounted(() => {
   wv.addEventListener('did-fail-load', handleDidFailLoad)
   wv.addEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.addEventListener('media-paused', handleMediaPaused)
+  wv.addEventListener('dom-ready', handleDomReady)
 })
 
 onUnmounted(() => {
@@ -84,6 +131,7 @@ onUnmounted(() => {
   wv.removeEventListener('did-fail-load', handleDidFailLoad)
   wv.removeEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.removeEventListener('media-paused', handleMediaPaused)
+  wv.removeEventListener('dom-ready', handleDomReady)
 })
 </script>
 
