@@ -108,10 +108,10 @@ export const useUiStore = defineStore('ui', () => {
     updateDialogOpen.value = false
   }
 
-  async function loadFromDisk(): Promise<void> {
-    const state = await window.api.getState()
-    sidebarExpanded.value = state.sidebarExpanded ?? true
-    openLinksInNewTab.value = state.openLinksInNewTab ?? true
+  async function loadFromDisk(preloaded?: unknown): Promise<void> {
+    const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
+    sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
+    openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
   }
 
   return {

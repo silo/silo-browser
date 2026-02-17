@@ -8,16 +8,17 @@ const uiStore = useUiStore()
 
 const name = ref('')
 const url = ref('')
+const nameManuallyEdited = ref(false)
 
 // Auto-derive name from URL hostname
 watch(url, (newUrl) => {
-  if (name.value) return // Don't override manual input
+  if (nameManuallyEdited.value) return
   try {
     const parsed = new URL(newUrl.startsWith('http') ? newUrl : `https://${newUrl}`)
     const host = parsed.hostname.replace('www.', '')
     name.value = host.charAt(0).toUpperCase() + host.slice(1).split('.')[0]
   } catch {
-    // URL not yet valid, skip
+    name.value = ''
   }
 })
 
@@ -37,9 +38,14 @@ function submit(): void {
   close()
 }
 
+function onNameInput(): void {
+  nameManuallyEdited.value = true
+}
+
 function close(): void {
   name.value = ''
   url.value = ''
+  nameManuallyEdited.value = false
   uiStore.closeAddTabDialog()
 }
 </script>
@@ -71,6 +77,7 @@ function close(): void {
           placeholder="Auto-detected from URL"
           class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500 mb-6"
           @keydown.enter="submit"
+          @input="onNameInput"
         />
 
         <div class="flex justify-end gap-2">

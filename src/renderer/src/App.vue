@@ -1,25 +1,41 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import TheSidebar from '@renderer/components/sidebar/TheSidebar.vue'
 import TheContentArea from '@renderer/components/content/TheContentArea.vue'
 import ContextMenu from '@renderer/components/ContextMenu.vue'
-import AddGroupDialog from '@renderer/components/dialogs/AddGroupDialog.vue'
-import AddTabDialog from '@renderer/components/dialogs/AddTabDialog.vue'
-import EditGroupDialog from '@renderer/components/dialogs/EditGroupDialog.vue'
-import EditTabDialog from '@renderer/components/dialogs/EditTabDialog.vue'
-import SettingsDialog from '@renderer/components/dialogs/SettingsDialog.vue'
-import UpdateDialog from '@renderer/components/dialogs/UpdateDialog.vue'
+
+const AddGroupDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/AddGroupDialog.vue')
+)
+const AddTabDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/AddTabDialog.vue')
+)
+const EditGroupDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/EditGroupDialog.vue')
+)
+const EditTabDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/EditTabDialog.vue')
+)
+const SettingsDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/SettingsDialog.vue')
+)
+const UpdateDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/UpdateDialog.vue')
+)
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
+const webviewRegistry = useWebviewRegistry()
 
 onMounted(async () => {
-  await Promise.all([groupsStore.loadFromDisk(), uiStore.loadFromDisk()])
-  await topbarStore.loadFromDisk()
+  const state = await window.api.getState()
+  await Promise.all([groupsStore.loadFromDisk(state), uiStore.loadFromDisk(state)])
+  await topbarStore.loadFromDisk(state)
   window.addEventListener('keydown', handleKeydown)
 
   // Listen for "Open in New Tab" from webview context menu
@@ -72,16 +88,7 @@ function handleKeydown(e: KeyboardEvent): void {
   // Ctrl/Cmd+R — reload active webview (child or main)
   if (mod && e.key === 'r') {
     e.preventDefault()
-    let wv: Electron.WebviewTag | null = null
-    if (topbarStore.isChildActive) {
-      wv = document.querySelector(
-        `webview[data-child-tab-id="${topbarStore.activeTopbarTabId}"]`
-      ) as Electron.WebviewTag | null
-    } else if (groupsStore.activeTabId) {
-      wv = document.querySelector(
-        `webview[data-tab-id="${groupsStore.activeTabId}"]`
-      ) as Electron.WebviewTag | null
-    }
+    const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
     wv?.reload()
     return
   }
@@ -110,7 +117,7 @@ function handleKeydown(e: KeyboardEvent): void {
   // Ctrl/Cmd+1-9 — switch to Nth loaded tab
   if (mod && e.key >= '1' && e.key <= '9') {
     e.preventDefault()
-    const allTabs = groupsStore.groups.flatMap((g) => g.tabs)
+    const allTabs = groupsStore.allTabsFlat
     const idx = parseInt(e.key) - 1
     if (idx < allTabs.length) {
       groupsStore.activateTab(allTabs[idx].id)
@@ -133,10 +140,10 @@ function handleKeydown(e: KeyboardEvent): void {
     <TheContentArea />
   </div>
   <ContextMenu />
-  <AddGroupDialog />
-  <AddTabDialog />
-  <EditGroupDialog />
-  <EditTabDialog />
-  <SettingsDialog />
-  <UpdateDialog />
+  <AddGroupDialog v-if="uiStore.addGroupDialogOpen" />
+  <AddTabDialog v-if="uiStore.addTabDialogOpen" />
+  <EditGroupDialog v-if="uiStore.editGroupDialogOpen" />
+  <EditTabDialog v-if="uiStore.editTabDialogOpen" />
+  <SettingsDialog v-if="uiStore.settingsDialogOpen" />
+  <UpdateDialog v-if="uiStore.updateDialogOpen" />
 </template>

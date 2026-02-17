@@ -3,10 +3,12 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
+import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
 const uiStore = useUiStore()
+const webviewRegistry = useWebviewRegistry()
 const isMac = window.api.platform === 'darwin'
 
 const urlInput = ref('')
@@ -32,28 +34,20 @@ const currentDomain = computed(() => {
   }
 })
 
-const activeWebview = computed<Electron.WebviewTag | null>(() => {
-  if (topbarStore.isChildActive) {
-    return document.querySelector(
-      `webview[data-child-tab-id="${topbarStore.activeTopbarTabId}"]`
-    ) as Electron.WebviewTag | null
-  }
-  if (!groupsStore.activeTabId) return null
-  return document.querySelector(
-    `webview[data-tab-id="${groupsStore.activeTabId}"]`
-  ) as Electron.WebviewTag | null
-})
+function getActiveWebview(): Electron.WebviewTag | null {
+  return webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+}
 
 function goBack(): void {
-  activeWebview.value?.goBack()
+  getActiveWebview()?.goBack()
 }
 
 function goForward(): void {
-  activeWebview.value?.goForward()
+  getActiveWebview()?.goForward()
 }
 
 function reload(): void {
-  activeWebview.value?.reload()
+  getActiveWebview()?.reload()
 }
 
 function openUrlBar(): void {
@@ -84,7 +78,7 @@ watch(
 )
 
 function navigateToUrl(): void {
-  const wv = activeWebview.value
+  const wv = getActiveWebview()
   if (!wv) return
   let url = urlInput.value.trim()
   if (!url) return
@@ -103,9 +97,7 @@ function goHome(): void {
     topbarStore.activateMainTab()
   } else {
     // Already on the primary tab — navigate back to its original URL
-    const wv = document.querySelector(
-      `webview[data-tab-id="${tab.id}"]`
-    ) as Electron.WebviewTag | null
+    const wv = webviewRegistry.getMain(tab.id)
     if (wv) wv.loadURL(tab.url)
   }
 }

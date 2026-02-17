@@ -45,8 +45,8 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     }, 500)
   }
 
-  async function loadFromDisk(): Promise<void> {
-    const state = await window.api.getState()
+  async function loadFromDisk(preloaded?: unknown): Promise<void> {
+    const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
     const loadedChildTabs = (state.childTabs ?? []) as ChildTab[]
 
     const validTabIds = new Set<string>()
@@ -71,7 +71,7 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
         isAudioPlaying: false
       }))
 
-    const restoredActiveId = state.activeChildTabId ?? null
+    const restoredActiveId = (state.activeChildTabId as string | null) ?? null
     if (restoredActiveId && childTabs.value.find((ct) => ct.id === restoredActiveId)) {
       activeChildTabId.value = restoredActiveId
     } else {

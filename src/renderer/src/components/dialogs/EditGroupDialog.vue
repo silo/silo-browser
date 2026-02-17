@@ -25,7 +25,8 @@ watch(
       selectedColor.value = group.color
       userAgent.value = group.userAgent ?? ''
     }
-  }
+  },
+  { immediate: true }
 )
 
 function submit(): void {

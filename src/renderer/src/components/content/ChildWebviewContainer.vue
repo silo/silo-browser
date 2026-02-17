@@ -2,6 +2,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useGroupsStore } from '@renderer/stores/groups'
+import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import type { ChildTab } from '@renderer/types'
 
 const props = defineProps<{
@@ -11,6 +13,7 @@ const props = defineProps<{
 
 const topbarStore = useTopbarTabsStore()
 const groupsStore = useGroupsStore()
+const { registerChild, unregisterChild } = useWebviewRegistry()
 const webviewRef = ref<Electron.WebviewTag | null>(null)
 
 const parentTab = computed(() => groupsStore.findTab(props.childTab.parentTabId))
@@ -62,31 +65,7 @@ const handleDomReady = (() => {
   const wv = webviewRef.value
   if (!wv) return
   const enabled = parentTab.value?.notificationsEnabled ?? true
-  wv.executeJavaScript(`
-    (() => {
-      if (window.__siloNotifWrapped) return;
-      window.__siloNotifEnabled = ${enabled};
-      const OrigNotification = window.Notification;
-      const SiloNotification = function(title, options) {
-        if (!window.__siloNotifEnabled) return {};
-        return new OrigNotification(title, options);
-      };
-      SiloNotification.requestPermission = () => {
-        return OrigNotification.requestPermission.call(OrigNotification);
-      };
-      Object.defineProperty(SiloNotification, 'permission', {
-        get: () => OrigNotification.permission
-      });
-      SiloNotification.prototype = OrigNotification.prototype;
-      window.Notification = SiloNotification;
-      const origShow = ServiceWorkerRegistration.prototype.showNotification;
-      ServiceWorkerRegistration.prototype.showNotification = function(...args) {
-        if (!window.__siloNotifEnabled) return Promise.resolve();
-        return origShow.apply(this, args);
-      };
-      window.__siloNotifWrapped = true;
-    })()
-  `).catch(() => {})
+  wv.executeJavaScript(getNotificationInjectionScript(enabled)).catch(() => {})
 }) as EventListener
 
 watch(
@@ -100,6 +79,8 @@ onMounted(() => {
   const wv = webviewRef.value
   if (!wv) return
 
+  registerChild(props.childTab.id, wv)
+
   wv.addEventListener('page-favicon-updated', handleFaviconUpdated)
   wv.addEventListener('did-navigate', handleDidNavigate)
   wv.addEventListener('did-navigate-in-page', handleDidNavigateInPage)
@@ -111,6 +92,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unregisterChild(props.childTab.id)
   const wv = webviewRef.value
   if (!wv) return
 

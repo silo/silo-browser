@@ -20,11 +20,13 @@ const isMac = window.api.platform === 'darwin'
     <div v-if="isMac" class="h-9 shrink-0" style="-webkit-app-region: drag" />
 
     <div class="flex-1 overflow-y-auto overflow-x-hidden py-2">
-      <SidebarGroup
-        v-for="group in groupsStore.sortedGroups"
-        :key="group.id"
-        :group="group"
-      />
+      <TransitionGroup tag="div" name="group-list">
+        <SidebarGroup
+          v-for="group in groupsStore.sortedGroups"
+          :key="group.id"
+          :group="group"
+        />
+      </TransitionGroup>
       <div
         v-if="groupsStore.groups.length === 0"
         class="px-3 py-4 text-xs text-gray-500 text-center"

@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
-import { getCachedState } from './store'
+import { getCachedState, loadState } from './store'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
@@ -157,9 +157,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  loadState()
   registerIpcHandlers()
   const mainWindow = createWindow()
-  initAutoUpdater(mainWindow)
+  setTimeout(() => initAutoUpdater(mainWindow), 3000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

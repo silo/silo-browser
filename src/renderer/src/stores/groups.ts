@@ -45,6 +45,12 @@ export const useGroupsStore = defineStore('groups', () => {
     return count
   })
 
+  const allTabsFlat = computed<TabItem[]>(() =>
+    sortedGroups.value.flatMap((g) =>
+      [...g.tabs].sort((a, b) => a.order - b.order)
+    )
+  )
+
   // --- Helpers ---
 
   function findTab(tabId: string): TabItem | null {
@@ -175,7 +181,8 @@ export const useGroupsStore = defineStore('groups', () => {
     const oldIndex = sorted.findIndex((g) => g.id === groupId)
     if (oldIndex === -1 || oldIndex === newIndex) return
     const [moved] = sorted.splice(oldIndex, 1)
-    sorted.splice(newIndex, 0, moved)
+    const adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex
+    sorted.splice(adjusted, 0, moved)
     sorted.forEach((g, i) => (g.order = i))
     debouncedSave()
   }
@@ -199,7 +206,8 @@ export const useGroupsStore = defineStore('groups', () => {
     const [tab] = sourceGroup.tabs.splice(tabIdx, 1)
     const crossGroup = sourceGroup.id !== targetGroup.id
     tab.groupId = targetGroupId
-    targetGroup.tabs.splice(newIndex, 0, tab)
+    const adjustedIndex = !crossGroup && tabIdx < newIndex ? newIndex - 1 : newIndex
+    targetGroup.tabs.splice(adjustedIndex, 0, tab)
     sourceGroup.tabs.forEach((t, i) => (t.order = i))
     targetGroup.tabs.forEach((t, i) => (t.order = i))
 
@@ -271,10 +279,10 @@ export const useGroupsStore = defineStore('groups', () => {
     }, 500)
   }
 
-  async function loadFromDisk(): Promise<void> {
-    const state = await window.api.getState()
+  async function loadFromDisk(preloaded?: unknown): Promise<void> {
+    const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
     groups.value = (state.groups ?? []) as GroupItem[]
-    activeTabId.value = state.activeTabId ?? null
+    activeTabId.value = (state.activeTabId as string | null) ?? null
     for (const group of groups.value) {
       for (const tab of group.tabs) {
         tab.isLoaded = false
@@ -298,6 +306,7 @@ export const useGroupsStore = defineStore('groups', () => {
     activeGroup,
     allLoadedTabs,
     totalNotifications,
+    allTabsFlat,
     findTab,
     findGroup,
     addGroup,

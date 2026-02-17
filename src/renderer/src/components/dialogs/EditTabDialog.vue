@@ -22,7 +22,8 @@ watch(
       iconEmoji.value = tab.iconEmoji ?? ''
       notificationsEnabled.value = tab.notificationsEnabled
     }
-  }
+  },
+  { immediate: true }
 )
 
 function submit(): void {

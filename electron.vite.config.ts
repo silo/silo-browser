@@ -18,6 +18,9 @@ export default defineConfig({
     }
   },
   renderer: {
+    server: {
+      port: 7456
+    },
     build: {
       sourcemap: false
     },

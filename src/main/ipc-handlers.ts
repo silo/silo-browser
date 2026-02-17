@@ -2,7 +2,7 @@ import { app, ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { autoUpdater } from 'electron-updater'
-import { loadState, saveState } from './store'
+import { getCachedState, saveState } from './store'
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => {
@@ -10,7 +10,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('store:get-state', () => {
-    return loadState()
+    return getCachedState()
   })
 
   ipcMain.handle('store:save-groups', async (_event, groups: unknown[]) => {
@@ -66,7 +66,7 @@ export function registerIpcHandlers(): void {
       filters: [{ name: 'JSON', extensions: ['json'] }]
     })
     if (result.canceled || !result.filePath) return null
-    const state = loadState()
+    const state = getCachedState()
     await writeFile(result.filePath, JSON.stringify(state, null, 2))
     return result.filePath
   })

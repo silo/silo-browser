@@ -7,3 +7,20 @@
 .app-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* Sidebar drag-and-drop reorder animations */
+.tab-list-move {
+  transition: transform 200ms ease;
+}
+
+.tab-list-leave-active {
+  position: absolute;
+}
+
+.group-list-move {
+  transition: transform 200ms ease;
+}
+
+.group-list-leave-active {
+  position: absolute;
+}
