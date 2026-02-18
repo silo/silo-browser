@@ -52,7 +52,7 @@ fi
 pnpm pkg set version="$VERSION"
 
 # Commit and tag with release notes
-git add -A
+git add package.json
 git commit -m "v$VERSION"
 git tag -a "v$VERSION" -m "$NOTES"
 git push && git push --tags
