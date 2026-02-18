@@ -159,7 +159,8 @@ function handleDragLeave(e: DragEvent): void {
     <div
       ref="tabEl"
       :class="[
-        'flex items-center px-2 py-1.5 cursor-pointer rounded mx-1 transition-all relative',
+        'flex items-center py-1.5 cursor-pointer rounded mx-1 transition-all relative',
+        uiStore.sidebarExpanded ? 'px-2' : 'px-1 justify-center',
         isActive ? 'bg-gray-600' : 'hover:bg-gray-700/50',
         isBeingDragged ? 'opacity-40' : ''
       ]"

@@ -99,7 +99,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function updateGroup(
     groupId: string,
-    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'userAgent'>>
+    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji' | 'userAgent'>>
   ): void {
     const group = findGroup(groupId)
     if (group) {

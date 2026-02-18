@@ -170,7 +170,8 @@ function handleDragLeave(e: DragEvent): void {
     <div
       ref="groupHeaderEl"
       :class="[
-        'flex items-center justify-between px-2 py-1.5 cursor-pointer transition-colors',
+        'flex items-center py-1.5 cursor-pointer transition-colors',
+        uiStore.sidebarExpanded ? 'justify-between px-2' : 'justify-center px-1',
         isDropHighlighted
           ? 'bg-blue-500/20 ring-1 ring-blue-400/40 rounded'
           : 'hover:bg-gray-700/50'
@@ -184,8 +185,9 @@ function handleDragLeave(e: DragEvent): void {
       @dragend="handleDragEnd"
       @dragleave="handleDragLeave"
     >
-      <div class="flex items-center gap-1.5 min-w-0">
+      <div class="flex items-center gap-1.5 min-w-0" :class="!uiStore.sidebarExpanded ? 'w-full justify-center' : ''">
         <svg
+          v-if="uiStore.sidebarExpanded"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
@@ -203,6 +205,21 @@ function handleDragLeave(e: DragEvent): void {
           class="text-xs font-semibold text-gray-300 truncate uppercase tracking-wider"
         >
           {{ group.name }}
+        </span>
+        <span
+          v-if="!uiStore.sidebarExpanded && group.iconEmoji"
+          class="w-6 h-6 rounded text-base flex items-center justify-center"
+          :title="group.name"
+        >
+          {{ group.iconEmoji }}
+        </span>
+        <span
+          v-if="!uiStore.sidebarExpanded && !group.iconEmoji"
+          class="w-6 h-6 rounded text-[11px] font-bold flex items-center justify-center text-white/90"
+          :style="{ backgroundColor: group.color }"
+          :title="group.name"
+        >
+          {{ group.name.charAt(0).toUpperCase() }}
         </span>
       </div>
       <button

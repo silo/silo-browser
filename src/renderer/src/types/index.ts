@@ -19,6 +19,7 @@ export interface GroupItem {
   id: string
   name: string
   color: string
+  iconEmoji?: string
   order: number
   isCollapsed: boolean
   userAgent?: string
