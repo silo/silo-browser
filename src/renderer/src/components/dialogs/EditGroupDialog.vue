@@ -9,7 +9,6 @@ const uiStore = useUiStore()
 const name = ref('')
 const selectedColor = ref('#3b82f6')
 const iconEmoji = ref('')
-const userAgent = ref('')
 
 const colorPresets = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
@@ -25,7 +24,6 @@ watch(
       name.value = group.name
       selectedColor.value = group.color
       iconEmoji.value = group.iconEmoji ?? ''
-      userAgent.value = group.userAgent ?? ''
     }
   },
   { immediate: true }
@@ -37,8 +35,7 @@ function submit(): void {
   groupsStore.updateGroup(uiStore.editGroupTargetId, {
     name: trimmed,
     color: selectedColor.value,
-    iconEmoji: iconEmoji.value.trim() || undefined,
-    userAgent: userAgent.value.trim() || undefined
+    iconEmoji: iconEmoji.value.trim() || undefined
   })
   close()
 }
@@ -88,15 +85,7 @@ function close(): void {
           maxlength="2"
         />
 
-        <label class="block text-sm text-gray-400 mb-1">Custom User Agent (optional)</label>
-        <input
-          v-model="userAgent"
-          type="text"
-          placeholder="Leave empty for default"
-          class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500 mb-6"
-        />
-
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-end gap-2 mt-2">
           <button
             @click="close"
             class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"

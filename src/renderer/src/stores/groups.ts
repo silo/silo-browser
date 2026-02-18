@@ -99,7 +99,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function updateGroup(
     groupId: string,
-    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji' | 'userAgent'>>
+    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji'>>
   ): void {
     const group = findGroup(groupId)
     if (group) {
@@ -263,7 +263,6 @@ export const useGroupsStore = defineStore('groups', () => {
           color: rawGroup.color,
           order: rawGroup.order,
           isCollapsed: rawGroup.isCollapsed,
-          userAgent: rawGroup.userAgent,
           tabs: rawGroup.tabs.map((t) => ({
             id: t.id,
             groupId: t.groupId,

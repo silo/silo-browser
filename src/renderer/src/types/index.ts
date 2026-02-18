@@ -22,7 +22,6 @@ export interface GroupItem {
   iconEmoji?: string
   order: number
   isCollapsed: boolean
-  userAgent?: string
   tabs: TabItem[]
 }
 
