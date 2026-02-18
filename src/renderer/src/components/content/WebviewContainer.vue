@@ -72,12 +72,21 @@ const handleDomReady = (() => {
   if (!wv) return
   const enabled = props.tab.notificationsEnabled
   wv.executeJavaScript(getNotificationInjectionScript(enabled)).catch(() => {})
+  if (props.tab.isMuted) wv.setAudioMuted(true)
 }) as EventListener
 
 watch(
   () => props.tab.notificationsEnabled,
   (enabled) => {
     setNotifEnabled(enabled)
+  }
+)
+
+watch(
+  () => props.tab.isMuted,
+  (muted) => {
+    const wv = webviewRef.value
+    if (wv) wv.setAudioMuted(muted)
   }
 )
 

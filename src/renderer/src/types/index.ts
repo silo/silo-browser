@@ -12,6 +12,7 @@ export interface TabItem {
   currentUrl?: string // Runtime-only — tracks navigated URL
   currentTitle?: string // Runtime-only — tracks page title
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
+  isMuted: boolean
 }
 
 export interface GroupItem {

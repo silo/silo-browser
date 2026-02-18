@@ -120,7 +120,8 @@ export const useGroupsStore = defineStore('groups', () => {
       order: group.tabs.length,
       isLoaded: false,
       notificationsEnabled: true,
-      notificationCount: 0
+      notificationCount: 0,
+      isMuted: false
     }
     group.tabs.push(tab)
     debouncedSave()
@@ -146,7 +147,7 @@ export const useGroupsStore = defineStore('groups', () => {
   function updateTab(
     tabId: string,
     updates: Partial<
-      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled'>
+      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted'>
     >
   ): void {
     const tab = findTab(tabId)
@@ -271,7 +272,8 @@ export const useGroupsStore = defineStore('groups', () => {
             iconUrl: t.iconUrl,
             iconEmoji: t.iconEmoji,
             order: t.order,
-            notificationsEnabled: t.notificationsEnabled
+            notificationsEnabled: t.notificationsEnabled,
+            isMuted: t.isMuted
           }))
         }
       })
@@ -289,6 +291,7 @@ export const useGroupsStore = defineStore('groups', () => {
         tab.isAudioPlaying = false
         tab.notificationCount = tab.notificationCount ?? 0
         tab.notificationsEnabled = tab.notificationsEnabled ?? true
+        tab.isMuted = tab.isMuted ?? false
       }
     }
     // Mark the active tab as loaded so its webview renders on startup

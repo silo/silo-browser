@@ -216,7 +216,7 @@ function handleDragLeave(e: DragEvent): void {
     </div>
 
     <TransitionGroup
-      v-show="!group.isCollapsed"
+      v-if="!group.isCollapsed"
       tag="div"
       name="tab-list"
       class="pb-1"
