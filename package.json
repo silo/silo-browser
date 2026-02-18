@@ -18,6 +18,7 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win --publish never",
     "build:mac": "npm run build && electron-builder --mac --publish never",
+    "build:mac:fast": "npm run build && electron-builder --mac --dir --arm64 --publish never -c.compression=store",
     "build:linux": "npm run build && electron-builder --linux --publish never",
     "generate-icons": "node scripts/generate-icons.mjs"
   },
