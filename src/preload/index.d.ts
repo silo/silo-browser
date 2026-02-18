@@ -20,6 +20,12 @@ export interface SiloApi {
   onUpdateDownloaded: (callback: (version: string) => void) => void
   removeUpdateDownloadedListener: () => void
   quitAndInstall: () => Promise<void>
+  checkForUpdates: () => Promise<void>
+  openReleasesPage: () => Promise<void>
+  onUpdaterFallbackAvailable: (callback: (version: string) => void) => void
+  removeUpdaterFallbackAvailableListener: () => void
+  onUpdaterUpToDate: (callback: () => void) => void
+  removeUpdaterUpToDateListener: () => void
 }
 
 declare global {

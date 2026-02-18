@@ -37,7 +37,25 @@ const api = {
   removeUpdateDownloadedListener: (): void => {
     ipcRenderer.removeAllListeners('updater:update-downloaded')
   },
-  quitAndInstall: (): Promise<void> => ipcRenderer.invoke('updater:quit-and-install')
+  quitAndInstall: (): Promise<void> => ipcRenderer.invoke('updater:quit-and-install'),
+  checkForUpdates: (): Promise<void> => ipcRenderer.invoke('updater:check-for-updates'),
+  openReleasesPage: (): Promise<void> => ipcRenderer.invoke('updater:open-releases-page'),
+  onUpdaterFallbackAvailable: (callback: (version: string) => void): void => {
+    ipcRenderer.on('updater:fallback-available', (_event, version: string) => {
+      callback(version)
+    })
+  },
+  removeUpdaterFallbackAvailableListener: (): void => {
+    ipcRenderer.removeAllListeners('updater:fallback-available')
+  },
+  onUpdaterUpToDate: (callback: () => void): void => {
+    ipcRenderer.on('updater:up-to-date', () => {
+      callback()
+    })
+  },
+  removeUpdaterUpToDateListener: (): void => {
+    ipcRenderer.removeAllListeners('updater:up-to-date')
+  }
 }
 
 if (process.contextIsolated) {

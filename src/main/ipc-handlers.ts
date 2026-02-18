@@ -1,8 +1,8 @@
 import { app, ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
-import { autoUpdater } from 'electron-updater'
 import { getCachedState, saveState } from './store'
+import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => {
@@ -54,7 +54,15 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('updater:quit-and-install', () => {
-    autoUpdater.quitAndInstall()
+    quitAndInstall()
+  })
+
+  ipcMain.handle('updater:check-for-updates', () => {
+    checkForUpdates()
+  })
+
+  ipcMain.handle('updater:open-releases-page', () => {
+    openReleasesPage()
   })
 
   ipcMain.handle('dialog:export-config', async () => {

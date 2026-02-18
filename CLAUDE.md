@@ -109,4 +109,3 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 
 ## Remaining Features (not yet implemented)
 - Split view (two tabs side by side)
-- Auto-updater

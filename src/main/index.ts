@@ -1,8 +1,8 @@
 import { app, shell, BrowserWindow, Menu, MenuItem, clipboard } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import { registerIpcHandlers } from './ipc-handlers'
+import { initAutoUpdater } from './updater'
 import { getCachedState, loadState } from './store'
 import icon from '../../resources/icon.png?asset'
 
@@ -42,21 +42,6 @@ function createWindow(): BrowserWindow {
   }
 
   return mainWindow
-}
-
-function initAutoUpdater(mainWindow: BrowserWindow): void {
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
-
-  autoUpdater.on('update-downloaded', (info) => {
-    mainWindow.webContents.send('updater:update-downloaded', info.version)
-  })
-
-  autoUpdater.on('error', (err) => {
-    console.error('Auto-updater error:', err)
-  })
-
-  autoUpdater.checkForUpdates()
 }
 
 // Intercept webview context menus and new-window requests

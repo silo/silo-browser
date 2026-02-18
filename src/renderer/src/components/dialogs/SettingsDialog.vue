@@ -8,10 +8,20 @@ const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
 const appVersion = ref('')
+const checkingForUpdates = ref(false)
 
 onMounted(async () => {
   appVersion.value = await window.api.getAppVersion()
 })
+
+function handleCheckForUpdates(): void {
+  checkingForUpdates.value = true
+  uiStore.updaterUpToDate = false
+  window.api.checkForUpdates()
+  setTimeout(() => {
+    checkingForUpdates.value = false
+  }, 5000)
+}
 
 async function handleImport(): Promise<void> {
   const result = await window.api.importConfig()
@@ -136,6 +146,43 @@ function close(): void {
                 </svg>
                 <span>Import Configuration</span>
               </button>
+            </div>
+          </div>
+
+          <!-- Updates section -->
+          <div>
+            <h3
+              class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3"
+            >
+              Updates
+            </h3>
+            <div class="space-y-2">
+              <button
+                @click="handleCheckForUpdates"
+                :disabled="checkingForUpdates"
+                class="w-full flex items-center gap-3 px-3 py-2 bg-gray-900 border border-gray-700 rounded hover:border-gray-500 transition-colors text-sm text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  class="w-4 h-4 text-gray-400"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.397a.75.75 0 00-.75.75v3.834a.75.75 0 001.5 0v-2.09l.312.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm-10.624-2.85a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h3.834a.75.75 0 00.75-.75V3.334a.75.75 0 00-1.5 0v2.09l-.311-.31A7 7 0 002.83 8.252a.75.75 0 001.449.39z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <span v-if="checkingForUpdates">Checking...</span>
+                <span v-else>Check for Updates</span>
+              </button>
+              <p
+                v-if="uiStore.updaterUpToDate && !checkingForUpdates"
+                class="text-xs text-green-400 px-3"
+              >
+                You're on the latest version.
+              </p>
             </div>
           </div>
 

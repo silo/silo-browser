@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useUiStore } from '@renderer/stores/ui'
 
 const uiStore = useUiStore()
 
+const isFallback = computed(() => uiStore.fallbackVersion !== null)
+
 function restartNow(): void {
   window.api.quitAndInstall()
+}
+
+function downloadFromGitHub(): void {
+  window.api.openReleasesPage()
+  close()
 }
 
 function close(): void {
@@ -45,9 +53,15 @@ function close(): void {
         <!-- Content -->
         <div class="px-6 py-5">
           <p class="text-sm text-gray-300">
-            Version <span class="font-semibold text-white">{{ uiStore.updateVersion }}</span> has been downloaded and is ready to install.
+            Version <span class="font-semibold text-white">{{ uiStore.updateVersion }}</span>
+            <template v-if="isFallback">
+              is available. Automatic update could not be applied — you can download it manually from GitHub.
+            </template>
+            <template v-else>
+              has been downloaded and is ready to install.
+            </template>
           </p>
-          <p class="text-xs text-gray-500 mt-2">
+          <p v-if="!isFallback" class="text-xs text-gray-500 mt-2">
             You can restart now to apply the update, or it will be installed the next time you launch the app.
           </p>
         </div>
@@ -61,6 +75,14 @@ function close(): void {
             Later
           </button>
           <button
+            v-if="isFallback"
+            @click="downloadFromGitHub"
+            class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+          >
+            Download from GitHub
+          </button>
+          <button
+            v-else
             @click="restartNow"
             class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors"
           >

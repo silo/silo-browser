@@ -97,11 +97,24 @@ export const useUiStore = defineStore('ui', () => {
     settingsDialogOpen.value = false
   }
 
+  // --- Update state ---
+  const updaterUpToDate = ref(false)
+  function setUpdaterUpToDate(): void {
+    updaterUpToDate.value = true
+  }
+
   // --- Update dialog ---
   const updateDialogOpen = ref(false)
   const updateVersion = ref<string | null>(null)
+  const fallbackVersion = ref<string | null>(null)
   function showUpdateDialog(version: string): void {
     updateVersion.value = version
+    fallbackVersion.value = null
+    updateDialogOpen.value = true
+  }
+  function showFallbackUpdateDialog(version: string): void {
+    updateVersion.value = version
+    fallbackVersion.value = version
     updateDialogOpen.value = true
   }
   function closeUpdateDialog(): void {
@@ -146,9 +159,13 @@ export const useUiStore = defineStore('ui', () => {
     settingsDialogOpen,
     openSettingsDialog,
     closeSettingsDialog,
+    updaterUpToDate,
+    setUpdaterUpToDate,
     updateDialogOpen,
     updateVersion,
+    fallbackVersion,
     showUpdateDialog,
+    showFallbackUpdateDialog,
     closeUpdateDialog,
     loadFromDisk
   }

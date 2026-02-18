@@ -50,12 +50,24 @@ onMounted(async () => {
   window.api.onUpdateDownloaded((version: string) => {
     uiStore.showUpdateDialog(version)
   })
+
+  // Listen for fallback update (native updater failed, manual download available)
+  window.api.onUpdaterFallbackAvailable((version: string) => {
+    uiStore.showFallbackUpdateDialog(version)
+  })
+
+  // Listen for up-to-date confirmation
+  window.api.onUpdaterUpToDate(() => {
+    uiStore.setUpdaterUpToDate()
+  })
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.api.removeOpenInNewTabListener()
   window.api.removeUpdateDownloadedListener()
+  window.api.removeUpdaterFallbackAvailableListener()
+  window.api.removeUpdaterUpToDateListener()
 })
 
 function handleKeydown(e: KeyboardEvent): void {
