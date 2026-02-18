@@ -1,34 +1,37 @@
-# silo-browser
+# Silo Browser
 
-An Electron application with Vue and TypeScript
+A desktop browser that organizes web apps into session-isolated groups.
 
-## Recommended IDE Setup
+Each group maintains its own cookies, localStorage, and session data — so you can run multiple accounts for the same service side by side. Built with Electron, Vue 3, and TypeScript.
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+## Features
 
-## Project Setup
+| Feature | Description |
+| --- | --- |
+| Session-isolated groups | Each group has its own cookies, localStorage, IndexedDB, and cache. Log into the same site with different accounts across groups. |
+| Tab management | Add, edit, delete, and reorder tabs with drag-and-drop. Move tabs between groups. |
+| Child tabs | Links that open in new windows stay inside the app as topbar tabs, scoped to the parent tab. |
+| Custom user agent | Set a custom user-agent string per group so sites see a different browser identity. |
+| Notification badges | Tabs show a red badge count when they receive notifications in the background. Per-tab notification toggle. |
+| Tab mute | Mute audio on any tab. A speaker icon indicates when a tab is playing audio. |
+| Collapsible sidebar | Expand or collapse the sidebar to icon-only mode. State persists across sessions. |
+| Keyboard shortcuts | Quick access to common actions — new tab, new group, reload, focus URL bar, switch tabs, and more. |
+| Emoji tab icons | Override a tab's favicon with any emoji character. |
+| Import / export config | Save your full setup (groups, tabs, settings) to a JSON file and restore it anytime. |
+| Auto-updater | The app checks for updates in the background and prompts you when a new version is ready. |
+| Cross-platform | Available for macOS, Windows, and Linux. |
 
-### Install
+## Development
 
 ```bash
-$ pnpm install
-```
+# Install dependencies
+pnpm install
 
-### Development
+# Start dev server with HMR
+pnpm dev
 
-```bash
-$ pnpm dev
-```
-
-### Build
-
-```bash
-# For windows
-$ pnpm build:win
-
-# For macOS
-$ pnpm build:mac
-
-# For Linux
-$ pnpm build:linux
+# Build for production
+pnpm build:mac
+pnpm build:win
+pnpm build:linux
 ```

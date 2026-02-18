@@ -297,7 +297,11 @@ export const useGroupsStore = defineStore('groups', () => {
     // Mark the active tab as loaded so its webview renders on startup
     if (activeTabId.value) {
       const activeTab = findTab(activeTabId.value)
-      if (activeTab) activeTab.isLoaded = true
+      if (activeTab) {
+        activeTab.isLoaded = true
+      } else {
+        activeTabId.value = null
+      }
     }
   }
 
