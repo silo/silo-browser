@@ -27,6 +27,19 @@ Each group maintains its own cookies, localStorage, and session data — so you 
 | Auto-updater | The app checks for updates in the background and prompts you when a new version is ready. |
 | Cross-platform | Available for macOS, Windows, and Linux. |
 
+## Why Electron?
+
+| Criteria | Electron | Tauri | CEF |
+| --- | --- | --- | --- |
+| Session isolation | `session.fromPartition()` | Fragmented — no unified API, platform-specific workarounds | `CefRequestContext` — works but complex cleanup |
+| Rendering engine | Chromium everywhere | Different per platform (WKWebView, WebKitGTK, WebView2) | Chromium everywhere |
+| Pop-up / OAuth support | Full | Broken — pop-ups blocked regardless of permissions | Full |
+| Favicon events | Built-in | Not available — requires JS workaround | Built-in |
+| Auto-updater | `electron-updater` | Built-in plugin | Must implement yourself |
+| Cross-platform packaging | `electron-builder` | Built-in | Must implement yourself |
+| Dev language | TypeScript / Vue | Rust + TypeScript / Vue | C++ or Java |
+| Dev iteration speed | Fast | Medium | Slow |
+
 ## Development
 
 ```bash
