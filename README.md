@@ -8,7 +8,7 @@ Each group maintains its own cookies, localStorage, and session data — so you 
 
 ![Silo Browser Tabs](screenshots/silo-browser-tabs.png)
 
-<video src="screenshots/silo-browser-video.mp4" controls></video>
+<video src="https://github.com/user-attachments/assets/bfce7b76-9db2-4fd0-b482-40b874e04d3c"></video>
 
 ## Features
 
