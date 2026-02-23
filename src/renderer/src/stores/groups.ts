@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
 import type { GroupItem, TabItem } from '@renderer/types'
 import { useTopbarTabsStore } from './topbar-tabs'
+import { useUiStore } from './ui'
 
 export const useGroupsStore = defineStore('groups', () => {
   const groups = ref<GroupItem[]>([])
@@ -163,6 +164,7 @@ export const useGroupsStore = defineStore('groups', () => {
       tab.isLoaded = true
       tab.notificationCount = 0
       activeTabId.value = tabId
+      useUiStore().closeSettingsPage()
       debouncedSave()
     }
   }

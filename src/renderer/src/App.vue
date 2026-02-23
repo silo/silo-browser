@@ -20,8 +20,8 @@ const EditGroupDialog = defineAsyncComponent(
 const EditTabDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/EditTabDialog.vue')
 )
-const SettingsDialog = defineAsyncComponent(
-  () => import('@renderer/components/dialogs/SettingsDialog.vue')
+const SettingsPage = defineAsyncComponent(
+  () => import('@renderer/components/settings/SettingsPage.vue')
 )
 const UpdateDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/UpdateDialog.vue')
@@ -112,10 +112,14 @@ function handleKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Ctrl/Cmd+, — open settings
+  // Ctrl/Cmd+, — toggle settings
   if (mod && e.key === ',') {
     e.preventDefault()
-    uiStore.openSettingsDialog()
+    if (uiStore.settingsPageOpen) {
+      uiStore.closeSettingsPage()
+    } else {
+      uiStore.openSettingsPage()
+    }
     return
   }
 
@@ -137,11 +141,16 @@ function handleKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Escape — close context menu, settings, URL bar, or dialogs
+  // Escape — close topmost layer first
   if (e.key === 'Escape') {
-    uiStore.hideContextMenu()
-    uiStore.closeUrlBar()
-    uiStore.closeSettingsDialog()
+    if (uiStore.contextMenuVisible) { uiStore.hideContextMenu(); return }
+    if (uiStore.addGroupDialogOpen) { uiStore.closeAddGroupDialog(); return }
+    if (uiStore.addTabDialogOpen) { uiStore.closeAddTabDialog(); return }
+    if (uiStore.editGroupDialogOpen) { uiStore.closeEditGroupDialog(); return }
+    if (uiStore.editTabDialogOpen) { uiStore.closeEditTabDialog(); return }
+    if (uiStore.updateDialogOpen) { uiStore.closeUpdateDialog(); return }
+    if (uiStore.urlBarOpen) { uiStore.closeUrlBar(); return }
+    if (uiStore.settingsPageOpen) { uiStore.closeSettingsPage(); return }
   }
 }
 </script>
@@ -149,13 +158,13 @@ function handleKeydown(e: KeyboardEvent): void {
 <template>
   <div class="flex h-screen w-screen overflow-hidden bg-surface-base text-fg-primary">
     <TheSidebar />
-    <TheContentArea />
+    <SettingsPage v-if="uiStore.settingsPageOpen" />
+    <TheContentArea v-show="!uiStore.settingsPageOpen" />
   </div>
   <ContextMenu />
   <AddGroupDialog v-if="uiStore.addGroupDialogOpen" />
   <AddTabDialog v-if="uiStore.addTabDialogOpen" />
   <EditGroupDialog v-if="uiStore.editGroupDialogOpen" />
   <EditTabDialog v-if="uiStore.editTabDialogOpen" />
-  <SettingsDialog v-if="uiStore.settingsDialogOpen" />
   <UpdateDialog v-if="uiStore.updateDialogOpen" />
 </template>

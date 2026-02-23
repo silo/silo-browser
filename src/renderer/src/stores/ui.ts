@@ -234,13 +234,13 @@ export const useUiStore = defineStore('ui', () => {
     urlBarOpen.value = false
   }
 
-  // --- Settings dialog ---
-  const settingsDialogOpen = ref(false)
-  function openSettingsDialog(): void {
-    settingsDialogOpen.value = true
+  // --- Settings page ---
+  const settingsPageOpen = ref(false)
+  function openSettingsPage(): void {
+    settingsPageOpen.value = true
   }
-  function closeSettingsDialog(): void {
-    settingsDialogOpen.value = false
+  function closeSettingsPage(): void {
+    settingsPageOpen.value = false
   }
 
   // --- Update state ---
@@ -306,9 +306,9 @@ export const useUiStore = defineStore('ui', () => {
     urlBarOpen,
     openUrlBar,
     closeUrlBar,
-    settingsDialogOpen,
-    openSettingsDialog,
-    closeSettingsDialog,
+    settingsPageOpen,
+    openSettingsPage,
+    closeSettingsPage,
     updaterUpToDate,
     setUpdaterUpToDate,
     updateDialogOpen,

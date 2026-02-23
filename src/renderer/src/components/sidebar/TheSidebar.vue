@@ -47,9 +47,12 @@ const isMac = window.api.platform === 'darwin'
 
         <!-- Settings -->
         <button
-          @click="uiStore.openSettingsDialog()"
+          @click="uiStore.settingsPageOpen ? uiStore.closeSettingsPage() : uiStore.openSettingsPage()"
           :class="[
-            'p-1.5 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors',
+            'p-1.5 rounded transition-colors',
+            uiStore.settingsPageOpen
+              ? 'bg-chrome-active text-chrome-fg-primary'
+              : 'text-chrome-fg-muted hover:text-chrome-fg-primary hover:bg-chrome-hover',
             uiStore.sidebarExpanded ? 'ml-auto' : ''
           ]"
           title="Settings"
