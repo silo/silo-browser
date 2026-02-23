@@ -24,8 +24,29 @@ esac
 echo ""
 echo "New version: $VERSION"
 echo ""
+
+# Get commits since last tag for reference
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -n "$LAST_TAG" ]; then
+  COMMITS=$(git log "$LAST_TAG"..HEAD --pretty=format:"- %s" --)
+  COMMIT_HEADER="# Commits since $LAST_TAG:"
+else
+  COMMITS=$(git log --pretty=format:"- %s" --)
+  COMMIT_HEADER="# All commits:"
+fi
+
 TMPFILE=$(mktemp)
-echo "# Write release notes below. Save and close the editor to continue." > "$TMPFILE"
+cat > "$TMPFILE" <<EOF
+# Write release notes below. Save and close the editor to continue.
+# Lines starting with # will be ignored.
+#
+$COMMIT_HEADER
+$(echo "$COMMITS" | sed 's/^/# /')
+#
+# Edit the lines below:
+
+$COMMITS
+EOF
 ${EDITOR:-nano} "$TMPFILE"
 NOTES=$(grep -v '^#' "$TMPFILE" | sed -e '/^$/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 rm -f "$TMPFILE"
