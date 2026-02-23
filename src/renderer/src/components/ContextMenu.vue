@@ -43,15 +43,15 @@ function handleAction(action: () => void): void {
     >
       <div
         ref="menuRef"
-        class="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 min-w-[180px]"
+        class="absolute bg-surface-raised border border-border-light rounded-lg shadow-xl py-1 min-w-[180px]"
         :style="{ left: uiStore.contextMenuX + 'px', top: uiStore.contextMenuY + 'px' }"
         @click.stop
       >
         <template v-for="(item, i) in uiStore.contextMenuItems" :key="i">
-          <div v-if="item.separator" class="border-t border-gray-700 my-1" />
+          <div v-if="item.separator" class="border-t border-border-default my-1" />
           <button
             v-else
-            class="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+            class="w-full text-left px-3 py-1.5 text-sm text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors"
             @click="handleAction(item.action)"
           >
             {{ item.label }}

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { ContextMenuEntry } from '@renderer/types'
+import { computed, ref } from 'vue'
+import type { AccentColor, ContextMenuEntry, SurfaceColor, ThemeMode } from '@renderer/types'
 
 export const useUiStore = defineStore('ui', () => {
   const sidebarExpanded = ref(true)
@@ -79,6 +79,152 @@ export const useUiStore = defineStore('ui', () => {
     window.api.saveOpenLinksInNewTab(value)
   }
 
+  // --- Theme ---
+  const themeMode = ref<ThemeMode>('dark')
+  const accentColor = ref<AccentColor>('blue')
+  const surfaceColor = ref<string>('default')
+
+  const ACCENT_CONFIG: Record<AccentColor, { hue: number; saturation: number }> = {
+    blue: { hue: 220, saturation: 90 },
+    green: { hue: 150, saturation: 70 },
+    amber: { hue: 38, saturation: 92 },
+    red: { hue: 0, saturation: 85 },
+    violet: { hue: 270, saturation: 75 },
+    pink: { hue: 330, saturation: 80 },
+    cyan: { hue: 190, saturation: 85 },
+    orange: { hue: 25, saturation: 92 }
+  }
+
+  const SURFACE_COLOR_CONFIG: Record<Exclude<SurfaceColor, 'default'>, { dark: string; light: string }> = {
+    slate: { dark: '#1a2332', light: '#f0f4f8' },
+    navy: { dark: '#1a1d33', light: '#edf0ff' },
+    forest: { dark: '#1a2920', light: '#edf7f0' },
+    wine: { dark: '#2a1a1e', light: '#fbf0f0' },
+    plum: { dark: '#231a2e', light: '#f5f0fa' },
+    teal: { dark: '#1a2827', light: '#edf7f6' },
+    earth: { dark: '#2a2318', light: '#faf6ed' }
+  }
+
+  function hexToLuminance(hex: string): number {
+    const r = parseInt(hex.slice(1, 3), 16) / 255
+    const g = parseInt(hex.slice(3, 5), 16) / 255
+    const b = parseInt(hex.slice(5, 7), 16) / 255
+    const toLinear = (c: number): number =>
+      c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  }
+
+  function mixHex(base: string, target: string, amount: number): string {
+    const p = (h: string): number[] => [
+      parseInt(h.slice(1, 3), 16),
+      parseInt(h.slice(3, 5), 16),
+      parseInt(h.slice(5, 7), 16)
+    ]
+    const [r1, g1, b1] = p(base)
+    const [r2, g2, b2] = p(target)
+    const m = (a: number, b: number): number => Math.round(a + (b - a) * amount)
+    return (
+      '#' +
+      [m(r1, r2), m(g1, g2), m(b1, b2)].map((c) => c.toString(16).padStart(2, '0')).join('')
+    )
+  }
+
+  const effectiveTheme = computed<'dark' | 'light'>(() => {
+    if (themeMode.value === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    return themeMode.value
+  })
+
+  const CHROME_VARS = [
+    '--chrome-fg-primary',
+    '--chrome-fg-secondary',
+    '--chrome-fg-muted',
+    '--chrome-fg-faint',
+    '--chrome-border',
+    '--chrome-hover',
+    '--chrome-active'
+  ]
+
+  function applyTheme(): void {
+    document.documentElement.setAttribute('data-theme', effectiveTheme.value)
+    const config = ACCENT_CONFIG[accentColor.value]
+    document.documentElement.style.setProperty('--accent-hue', String(config.hue))
+    document.documentElement.style.setProperty('--accent-saturation', `${config.saturation}%`)
+
+    const sv = surfaceColor.value
+    let surfaceHex: string | null = null
+    if (sv === 'default') {
+      document.documentElement.style.removeProperty('--surface-chrome')
+    } else if (sv in SURFACE_COLOR_CONFIG) {
+      const sc = SURFACE_COLOR_CONFIG[sv as Exclude<SurfaceColor, 'default'>]
+      surfaceHex = sc[effectiveTheme.value]
+      document.documentElement.style.setProperty('--surface-chrome', surfaceHex)
+    } else {
+      surfaceHex = sv
+      document.documentElement.style.setProperty('--surface-chrome', surfaceHex)
+    }
+
+    // Set chrome-specific text/border/hover colors based on surface luminance
+    if (!surfaceHex) {
+      CHROME_VARS.forEach((v) => document.documentElement.style.removeProperty(v))
+    } else {
+      const lum = hexToLuminance(surfaceHex)
+      const isLight = lum > 0.179
+      const contrast = isLight ? '#000000' : '#ffffff'
+
+      document.documentElement.style.setProperty(
+        '--chrome-fg-primary',
+        isLight ? '#111827' : '#ffffff'
+      )
+      document.documentElement.style.setProperty(
+        '--chrome-fg-secondary',
+        isLight ? '#374151' : '#d1d5db'
+      )
+      document.documentElement.style.setProperty(
+        '--chrome-fg-muted',
+        isLight ? '#6b7280' : '#9ca3af'
+      )
+      document.documentElement.style.setProperty(
+        '--chrome-fg-faint',
+        isLight ? '#9ca3af' : '#6b7280'
+      )
+      document.documentElement.style.setProperty('--chrome-border', mixHex(surfaceHex, contrast, 0.12))
+      document.documentElement.style.setProperty('--chrome-hover', mixHex(surfaceHex, contrast, 0.12))
+      document.documentElement.style.setProperty('--chrome-active', mixHex(surfaceHex, contrast, 0.2))
+    }
+  }
+
+  function persistTheme(): Promise<void> {
+    return window.api.saveTheme(themeMode.value, accentColor.value, surfaceColor.value)
+  }
+
+  async function setThemeMode(mode: ThemeMode): Promise<void> {
+    themeMode.value = mode
+    // Must await IPC so nativeTheme.themeSource is updated before we read matchMedia
+    await persistTheme()
+    applyTheme()
+  }
+
+  function setAccentColor(color: AccentColor): void {
+    accentColor.value = color
+    applyTheme()
+    persistTheme()
+  }
+
+  function setSurfaceColor(color: string): void {
+    surfaceColor.value = color
+    applyTheme()
+    persistTheme()
+  }
+
+  // Listen for OS theme changes when in 'system' mode
+  if (typeof window !== 'undefined') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (themeMode.value === 'system') applyTheme()
+    })
+  }
+
   // --- URL bar modal ---
   const urlBarOpen = ref(false)
   function openUrlBar(): void {
@@ -125,6 +271,10 @@ export const useUiStore = defineStore('ui', () => {
     const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
     sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
+    themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
+    accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'blue'
+    surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'default'
+    applyTheme()
   }
 
   return {
@@ -167,6 +317,14 @@ export const useUiStore = defineStore('ui', () => {
     showUpdateDialog,
     showFallbackUpdateDialog,
     closeUpdateDialog,
+    themeMode,
+    accentColor,
+    surfaceColor,
+    effectiveTheme,
+    setThemeMode,
+    setAccentColor,
+    setSurfaceColor,
+    applyTheme,
     loadFromDisk
   }
 })

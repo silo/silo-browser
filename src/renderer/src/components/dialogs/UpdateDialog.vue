@@ -24,18 +24,18 @@ function close(): void {
   <Teleport to="body">
     <div
       v-if="uiStore.updateDialogOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
       @click.self="close"
     >
       <div
-        class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 w-[400px] flex flex-col"
+        class="bg-surface-raised rounded-lg shadow-xl border border-border-default w-[400px] flex flex-col"
       >
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-          <h2 class="text-lg font-semibold text-white">Update Available</h2>
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border-default">
+          <h2 class="text-lg font-semibold text-fg-primary">Update Available</h2>
           <button
             @click="close"
-            class="text-gray-400 hover:text-white transition-colors"
+            class="text-fg-muted hover:text-fg-primary transition-colors"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -52,8 +52,8 @@ function close(): void {
 
         <!-- Content -->
         <div class="px-6 py-5">
-          <p class="text-sm text-gray-300">
-            Version <span class="font-semibold text-white">{{ uiStore.updateVersion }}</span>
+          <p class="text-sm text-fg-secondary">
+            Version <span class="font-semibold text-fg-primary">{{ uiStore.updateVersion }}</span>
             <template v-if="isFallback">
               is available. Automatic update could not be applied — you can download it manually from GitHub.
             </template>
@@ -61,30 +61,30 @@ function close(): void {
               has been downloaded and is ready to install.
             </template>
           </p>
-          <p v-if="!isFallback" class="text-xs text-gray-500 mt-2">
+          <p v-if="!isFallback" class="text-xs text-fg-faint mt-2">
             You can restart now to apply the update, or it will be installed the next time you launch the app.
           </p>
         </div>
 
         <!-- Actions -->
-        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-700">
+        <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-border-default">
           <button
             @click="close"
-            class="px-4 py-2 text-sm text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            class="px-4 py-2 text-sm text-fg-secondary hover:text-fg-primary bg-surface-hover hover:bg-surface-active rounded transition-colors"
           >
             Later
           </button>
           <button
             v-if="isFallback"
             @click="downloadFromGitHub"
-            class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+            class="px-4 py-2 text-sm text-white bg-accent hover:bg-accent-hover rounded transition-colors"
           >
             Download from GitHub
           </button>
           <button
             v-else
             @click="restartNow"
-            class="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded transition-colors"
+            class="px-4 py-2 text-sm text-white bg-accent hover:bg-accent-hover rounded transition-colors"
           >
             Restart Now
           </button>

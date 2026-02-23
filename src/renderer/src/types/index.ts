@@ -36,6 +36,10 @@ export interface ChildTab {
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
 }
 
+export type ThemeMode = 'dark' | 'light' | 'system'
+export type AccentColor = 'blue' | 'green' | 'amber' | 'red' | 'violet' | 'pink' | 'cyan' | 'orange'
+export type SurfaceColor = 'default' | 'slate' | 'navy' | 'forest' | 'wine' | 'plum' | 'teal' | 'earth'
+
 export interface AppState {
   groups: GroupItem[]
   activeTabId: string | null
@@ -43,6 +47,9 @@ export interface AppState {
   openLinksInNewTab: boolean
   childTabs: ChildTab[]
   activeChildTabId: string | null
+  themeMode: ThemeMode
+  accentColor: AccentColor
+  surfaceColor: string // SurfaceColor preset name or custom hex (e.g. '#1a2332')
 }
 
 export interface ContextMenuItem {

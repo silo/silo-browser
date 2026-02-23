@@ -164,7 +164,7 @@ function handleDragLeave(e: DragEvent): void {
     <!-- Group reorder indicator: before -->
     <div
       v-if="showGroupIndicatorBefore"
-      class="absolute top-0 left-1 right-1 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none"
+      class="absolute top-0 left-1 right-1 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
     />
 
     <div
@@ -173,8 +173,8 @@ function handleDragLeave(e: DragEvent): void {
         'flex items-center py-1.5 cursor-pointer transition-colors',
         uiStore.sidebarExpanded ? 'justify-between px-2' : 'justify-center px-1',
         isDropHighlighted
-          ? 'bg-blue-500/20 ring-1 ring-blue-400/40 rounded'
-          : 'hover:bg-gray-700/50'
+          ? 'bg-accent-muted ring-1 ring-accent-ring rounded'
+          : 'hover:bg-chrome-hover/50'
       ]"
       @click="groupsStore.toggleGroupCollapse(group.id)"
       @contextmenu="handleContextMenu"
@@ -191,7 +191,7 @@ function handleDragLeave(e: DragEvent): void {
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
-          class="w-3 h-3 text-gray-400 shrink-0 transition-transform duration-150"
+          class="w-3 h-3 text-chrome-fg-muted shrink-0 transition-transform duration-150"
           :class="group.isCollapsed ? '-rotate-90' : ''"
         >
           <path
@@ -202,7 +202,7 @@ function handleDragLeave(e: DragEvent): void {
         </svg>
         <span
           v-if="uiStore.sidebarExpanded"
-          class="text-xs font-semibold text-gray-300 truncate uppercase tracking-wider"
+          class="text-xs font-semibold text-chrome-fg-secondary truncate uppercase tracking-wider"
         >
           {{ group.name }}
         </span>
@@ -225,7 +225,7 @@ function handleDragLeave(e: DragEvent): void {
       <button
         v-if="uiStore.sidebarExpanded"
         @click.stop="uiStore.openAddTabDialog(group.id)"
-        class="text-gray-500 hover:text-white text-sm leading-none shrink-0"
+        class="text-chrome-fg-faint hover:text-chrome-fg-primary text-sm leading-none shrink-0"
         title="Add tab"
       >
         +
@@ -245,7 +245,7 @@ function handleDragLeave(e: DragEvent): void {
     <!-- Group reorder indicator: after -->
     <div
       v-if="showGroupIndicatorAfter"
-      class="absolute bottom-0 left-1 right-1 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none"
+      class="absolute bottom-0 left-1 right-1 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
     />
   </div>
 </template>

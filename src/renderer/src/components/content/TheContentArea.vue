@@ -13,7 +13,7 @@ const topbarStore = useTopbarTabsStore()
 <template>
   <div class="flex-1 flex flex-col min-w-0">
     <TheNavigationBar />
-    <main class="flex-1 relative bg-gray-900">
+    <main class="flex-1 relative bg-surface-base">
       <EmptyState v-if="!groupsStore.activeTab" />
       <WebviewContainer
         v-for="tab in groupsStore.allLoadedTabs"

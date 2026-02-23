@@ -14,6 +14,8 @@ const api = {
     ipcRenderer.invoke('store:save-sidebar-state', expanded),
   saveOpenLinksInNewTab: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('store:save-open-links-in-new-tab', value),
+  saveTheme: (themeMode: string, accentColor: string, surfaceColor: string): Promise<void> =>
+    ipcRenderer.invoke('store:save-theme', themeMode, accentColor, surfaceColor),
   saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null): Promise<void> =>
     ipcRenderer.invoke('store:save-child-tabs', childTabs, activeChildTabId),
   clearGroupSession: (groupId: string): Promise<void> =>

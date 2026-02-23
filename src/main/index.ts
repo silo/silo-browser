@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, Menu, MenuItem, clipboard } from 'electron'
+import { app, shell, BrowserWindow, Menu, MenuItem, clipboard, nativeTheme } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -7,6 +7,12 @@ import { getCachedState, loadState } from './store'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
+  const state = getCachedState()
+  const isLight =
+    state.themeMode === 'light' ||
+    (state.themeMode === 'system' && false) // system detection not available in main process, default dark
+  const bgColor = isLight ? '#f9fafb' : '#111827'
+
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -14,6 +20,7 @@ function createWindow(): BrowserWindow {
     minHeight: 400,
     show: false,
     autoHideMenuBar: true,
+    backgroundColor: bgColor,
     titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
     ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 12, y: 12 } } : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -143,6 +150,8 @@ app.whenReady().then(() => {
   })
 
   loadState()
+  const initialState = getCachedState()
+  nativeTheme.themeSource = initialState.themeMode as 'dark' | 'light' | 'system'
   registerIpcHandlers()
   const mainWindow = createWindow()
   setTimeout(() => initAutoUpdater(mainWindow), 3000)

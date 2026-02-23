@@ -147,7 +147,7 @@ function handleKeydown(e: KeyboardEvent): void {
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-gray-900 text-white">
+  <div class="flex h-screen w-screen overflow-hidden bg-surface-base text-fg-primary">
     <TheSidebar />
     <TheContentArea />
   </div>

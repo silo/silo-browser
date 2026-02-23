@@ -12,7 +12,7 @@ const isMac = window.api.platform === 'darwin'
 <template>
   <aside
     :class="[
-      'flex flex-col border-r border-gray-700 bg-gray-800 transition-all duration-200 shrink-0',
+      'flex flex-col border-r border-chrome-border bg-surface-chrome transition-all duration-200 shrink-0',
       uiStore.sidebarExpanded ? 'w-52' : 'w-14'
     ]"
   >
@@ -29,13 +29,13 @@ const isMac = window.api.platform === 'darwin'
       </TransitionGroup>
       <div
         v-if="groupsStore.groups.length === 0"
-        class="px-3 py-4 text-xs text-gray-500 text-center"
+        class="px-3 py-4 text-xs text-chrome-fg-faint text-center"
       >
         <span v-if="uiStore.sidebarExpanded">No groups yet</span>
       </div>
     </div>
 
-    <div class="border-t border-gray-700 p-1">
+    <div class="border-t border-chrome-border p-1">
       <div
         :class="
           uiStore.sidebarExpanded
@@ -49,7 +49,7 @@ const isMac = window.api.platform === 'darwin'
         <button
           @click="uiStore.openSettingsDialog()"
           :class="[
-            'p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors',
+            'p-1.5 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors',
             uiStore.sidebarExpanded ? 'ml-auto' : ''
           ]"
           title="Settings"
@@ -71,7 +71,7 @@ const isMac = window.api.platform === 'darwin'
         <!-- Sidebar collapse toggle -->
         <button
           @click="uiStore.toggleSidebar"
-          class="p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+          class="p-1.5 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
           :title="uiStore.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
         >
           <svg

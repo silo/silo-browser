@@ -38,29 +38,29 @@ function close(): void {
   <Teleport to="body">
     <div
       v-if="uiStore.addGroupDialogOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
       @click.self="close"
     >
-      <div class="bg-gray-800 rounded-lg p-6 w-80 shadow-xl border border-gray-700">
-        <h2 class="text-lg font-semibold text-white mb-4">New Group</h2>
+      <div class="bg-surface-raised rounded-lg p-6 w-80 shadow-xl border border-border-default">
+        <h2 class="text-lg font-semibold text-fg-primary mb-4">New Group</h2>
 
-        <label class="block text-sm text-gray-400 mb-1">Name</label>
+        <label class="block text-sm text-fg-muted mb-1">Name</label>
         <input
           v-model="name"
           type="text"
           placeholder="e.g. Work, Personal"
-          class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500 mb-4"
+          class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-4"
           @keydown.enter="submit"
           autofocus
         />
 
-        <label class="block text-sm text-gray-400 mb-2">Color</label>
+        <label class="block text-sm text-fg-muted mb-2">Color</label>
         <div class="flex gap-2 mb-6">
           <button
             v-for="color in colorPresets"
             :key="color"
             class="w-7 h-7 rounded-full border-2 transition-all"
-            :class="selectedColor === color ? 'border-white scale-110' : 'border-transparent'"
+            :class="selectedColor === color ? 'border-fg-primary scale-110' : 'border-transparent'"
             :style="{ backgroundColor: color }"
             @click="selectedColor = color"
           />
@@ -69,14 +69,14 @@ function close(): void {
         <div class="flex justify-end gap-2">
           <button
             @click="close"
-            class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+            class="px-4 py-1.5 text-sm text-fg-muted hover:text-fg-primary transition-colors"
           >
             Cancel
           </button>
           <button
             @click="submit"
             :disabled="!name.trim()"
-            class="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded transition-colors"
+            class="px-4 py-1.5 text-sm bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white rounded transition-colors"
           >
             Create
           </button>

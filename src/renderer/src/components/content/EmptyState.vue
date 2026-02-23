@@ -3,7 +3,7 @@ const isMac = window.api.platform === 'darwin'
 </script>
 
 <template>
-  <div class="flex items-center justify-center h-full text-gray-500 relative">
+  <div class="flex items-center justify-center h-full text-fg-faint relative">
     <!-- macOS drag region when no nav bar is visible -->
     <div
       v-if="isMac"
@@ -25,11 +25,11 @@ const isMac = window.api.platform === 'darwin'
           fill="white"
         />
       </svg>
-      <h1 class="text-2xl font-semibold text-gray-300 mb-2">Welcome to Silo Browser</h1>
-      <p class="text-base text-gray-400 mb-4">
+      <h1 class="text-2xl font-semibold text-fg-secondary mb-2">Welcome to Silo Browser</h1>
+      <p class="text-base text-fg-muted mb-4">
         Your web apps, organized and isolated.
       </p>
-      <p class="text-sm text-gray-600">
+      <p class="text-sm text-fg-ghost">
         Get started by adding a new group and tab in the sidebar.
       </p>
     </div>

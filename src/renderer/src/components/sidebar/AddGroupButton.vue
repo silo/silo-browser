@@ -7,7 +7,7 @@ const uiStore = useUiStore()
 <template>
   <button
     @click="uiStore.openAddGroupDialog()"
-    class="flex items-center gap-1.5 p-1.5 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+    class="flex items-center gap-1.5 p-1.5 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
     title="Create new group"
   >
     <svg

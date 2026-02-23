@@ -61,22 +61,22 @@ const statusIcons = computed(() => {
   if (!props.tab.notificationsEnabled) {
     icons.push({
       path: 'M9.143 17.082a24.248 24.248 0 0 0 3.844.148m-3.844-.148a23.856 23.856 0 0 1-5.455-1.31 8.964 8.964 0 0 0 2.3-5.542m3.155 6.852a3 3 0 0 0 5.667 1.97m1.965-2.277L21 21m-4.225-4.225a23.81 23.81 0 0 0 3.536-1.003A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6.53 6.53m10.245 10.245L6.53 6.53M3 3l3.53 3.53',
-      color: 'text-blue-400',
-      badgeColor: 'bg-blue-500'
+      color: 'text-accent-soft',
+      badgeColor: 'bg-accent'
     })
   }
   if (props.tab.isMuted) {
     icons.push({
       path: 'M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z',
-      color: 'text-red-400',
-      badgeColor: 'bg-red-500'
+      color: 'text-semantic-danger-soft',
+      badgeColor: 'bg-semantic-danger'
     })
   }
   if (hasAudio.value && !props.tab.isMuted) {
     icons.push({
       path: 'M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z',
-      color: 'text-blue-400',
-      badgeColor: 'bg-blue-500'
+      color: 'text-accent-soft',
+      badgeColor: 'bg-accent'
     })
   }
   return icons
@@ -179,7 +179,7 @@ function handleDragLeave(e: DragEvent): void {
     <!-- Drop indicator: before this tab -->
     <div
       v-if="showIndicatorBefore"
-      class="absolute top-0 left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none"
+      class="absolute top-0 left-2 right-2 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
     />
 
     <div
@@ -187,7 +187,7 @@ function handleDragLeave(e: DragEvent): void {
       :class="[
         'flex items-center py-1.5 cursor-pointer rounded mx-1 transition-all relative',
         uiStore.sidebarExpanded ? 'px-2' : 'px-1 justify-center',
-        isActive ? 'bg-gray-600' : 'hover:bg-gray-700/50',
+        isActive ? 'bg-chrome-active' : 'hover:bg-chrome-hover/50',
         isBeingDragged ? 'opacity-40' : ''
       ]"
       @click="activate"
@@ -213,13 +213,13 @@ function handleDragLeave(e: DragEvent): void {
         </span>
         <span
           v-else
-          class="w-5 h-5 bg-gray-500 rounded flex items-center justify-center text-[10px] font-bold"
+          class="w-5 h-5 bg-chrome-active rounded flex items-center justify-center text-[10px] font-bold"
         >
           {{ tab.name.charAt(0).toUpperCase() }}
         </span>
         <span
           v-if="tab.notificationCount > 0"
-          class="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5"
+          class="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-semantic-danger text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5"
         >
           {{ tab.notificationCount > 99 ? '99+' : tab.notificationCount }}
         </span>
@@ -234,7 +234,7 @@ function handleDragLeave(e: DragEvent): void {
           </svg>
         </span>
       </div>
-      <span v-if="uiStore.sidebarExpanded" class="ml-2 text-sm truncate text-gray-300">
+      <span v-if="uiStore.sidebarExpanded" class="ml-2 text-sm truncate text-chrome-fg-secondary">
         {{ tab.name }}
       </span>
       <div
@@ -260,7 +260,7 @@ function handleDragLeave(e: DragEvent): void {
     <!-- Drop indicator: after this tab -->
     <div
       v-if="showIndicatorAfter"
-      class="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-400 rounded-full z-10 pointer-events-none"
+      class="absolute bottom-0 left-2 right-2 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
     />
   </div>
 </template>

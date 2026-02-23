@@ -1,4 +1,4 @@
-import { app, ipcMain, session, shell, dialog, BrowserWindow } from 'electron'
+import { app, ipcMain, nativeTheme, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { getCachedState, saveState } from './store'
@@ -35,6 +35,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('store:save-open-links-in-new-tab', async (_event, value: boolean) => {
     await saveState({ openLinksInNewTab: value })
   })
+
+  ipcMain.handle(
+    'store:save-theme',
+    async (_event, themeMode: string, accentColor: string, surfaceColor: string) => {
+      nativeTheme.themeSource = themeMode as 'dark' | 'light' | 'system'
+      await saveState({ themeMode, accentColor, surfaceColor })
+    }
+  )
 
   ipcMain.handle(
     'store:save-child-tabs',
@@ -95,7 +103,17 @@ export function registerIpcHandlers(): void {
         const childTabs = Array.isArray(parsed.childTabs) ? parsed.childTabs : []
         const activeChildTabId =
           typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null
-        await saveState({ groups: parsed.groups, childTabs, activeChildTabId })
+        const themeMode = typeof parsed.themeMode === 'string' ? parsed.themeMode : undefined
+        const accentColor = typeof parsed.accentColor === 'string' ? parsed.accentColor : undefined
+        const surfaceColor = typeof parsed.surfaceColor === 'string' ? parsed.surfaceColor : undefined
+        await saveState({
+          groups: parsed.groups,
+          childTabs,
+          activeChildTabId,
+          ...(themeMode && { themeMode }),
+          ...(accentColor && { accentColor }),
+          ...(surfaceColor && { surfaceColor })
+        })
         return parsed
       }
       return null

@@ -10,7 +10,14 @@ export interface PersistedState {
   openLinksInNewTab: boolean
   childTabs: unknown[]
   activeChildTabId: string | null
+  themeMode: string
+  accentColor: string
+  surfaceColor: string
 }
+
+const VALID_THEME_MODES = ['dark', 'light', 'system']
+const VALID_ACCENT_COLORS = ['blue', 'green', 'amber', 'red', 'violet', 'pink', 'cyan', 'orange']
+const VALID_SURFACE_COLORS = ['default', 'slate', 'navy', 'forest', 'wine', 'plum', 'teal', 'earth']
 
 const defaultState: PersistedState = {
   groups: [],
@@ -18,7 +25,10 @@ const defaultState: PersistedState = {
   sidebarExpanded: true,
   openLinksInNewTab: true,
   childTabs: [],
-  activeChildTabId: null
+  activeChildTabId: null,
+  themeMode: 'dark',
+  accentColor: 'blue',
+  surfaceColor: 'default'
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -42,7 +52,21 @@ export function loadState(): PersistedState {
         typeof parsed.openLinksInNewTab === 'boolean' ? parsed.openLinksInNewTab : true,
       childTabs: Array.isArray(parsed.childTabs) ? parsed.childTabs : [],
       activeChildTabId:
-        typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null
+        typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null,
+      themeMode:
+        typeof parsed.themeMode === 'string' && VALID_THEME_MODES.includes(parsed.themeMode)
+          ? parsed.themeMode
+          : 'dark',
+      accentColor:
+        typeof parsed.accentColor === 'string' && VALID_ACCENT_COLORS.includes(parsed.accentColor)
+          ? parsed.accentColor
+          : 'blue',
+      surfaceColor:
+        typeof parsed.surfaceColor === 'string' &&
+        (VALID_SURFACE_COLORS.includes(parsed.surfaceColor) ||
+          /^#[0-9a-fA-F]{6}$/.test(parsed.surfaceColor))
+          ? parsed.surfaceColor
+          : 'default'
     }
     cachedState = { ...state }
     return state

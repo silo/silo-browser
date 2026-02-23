@@ -1,5 +1,155 @@
 @import 'tailwindcss';
 
+/* ===== Accent Color ===== */
+:root {
+  --accent-hue: 220;
+  --accent-saturation: 90%;
+}
+
+/* ===== Dark Theme (default) ===== */
+[data-theme='dark'] {
+  --surface-base: #111827;
+  --surface-raised: #1f2937;
+  --surface-hover: #374151;
+  --surface-active: #4b5563;
+  --surface-input: #111827;
+
+  --fg-primary: #ffffff;
+  --fg-secondary: #d1d5db;
+  --fg-muted: #9ca3af;
+  --fg-faint: #6b7280;
+  --fg-ghost: #4b5563;
+
+  --border-default: #374151;
+  --border-light: #4b5563;
+
+  --accent: hsl(var(--accent-hue), var(--accent-saturation), 48%);
+  --accent-hover: hsl(var(--accent-hue), var(--accent-saturation), 56%);
+  --accent-soft: hsl(var(--accent-hue), var(--accent-saturation), 65%);
+  --accent-muted: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.2);
+  --accent-ring: hsla(var(--accent-hue), var(--accent-saturation), 60%, 0.4);
+
+  --semantic-danger: #ef4444;
+  --semantic-danger-soft: #f87171;
+  --semantic-success: #4ade80;
+
+  --overlay: rgba(0, 0, 0, 0.5);
+
+  --surface-chrome: var(--surface-raised);
+
+  --chrome-fg-primary: var(--fg-primary);
+  --chrome-fg-secondary: var(--fg-secondary);
+  --chrome-fg-muted: var(--fg-muted);
+  --chrome-fg-faint: var(--fg-faint);
+  --chrome-border: var(--border-default);
+  --chrome-hover: var(--surface-hover);
+  --chrome-active: var(--surface-active);
+
+  color-scheme: dark;
+}
+
+/* ===== Light Theme ===== */
+[data-theme='light'] {
+  --surface-base: #f9fafb;
+  --surface-raised: #ffffff;
+  --surface-hover: #f3f4f6;
+  --surface-active: #e5e7eb;
+  --surface-input: #ffffff;
+
+  --fg-primary: #111827;
+  --fg-secondary: #374151;
+  --fg-muted: #6b7280;
+  --fg-faint: #9ca3af;
+  --fg-ghost: #d1d5db;
+
+  --border-default: #e5e7eb;
+  --border-light: #d1d5db;
+
+  --accent: hsl(var(--accent-hue), var(--accent-saturation), 45%);
+  --accent-hover: hsl(var(--accent-hue), var(--accent-saturation), 40%);
+  --accent-soft: hsl(var(--accent-hue), var(--accent-saturation), 45%);
+  --accent-muted: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.12);
+  --accent-ring: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.3);
+
+  --semantic-danger: #dc2626;
+  --semantic-danger-soft: #ef4444;
+  --semantic-success: #16a34a;
+
+  --overlay: rgba(0, 0, 0, 0.3);
+
+  --surface-chrome: var(--surface-raised);
+
+  --chrome-fg-primary: var(--fg-primary);
+  --chrome-fg-secondary: var(--fg-secondary);
+  --chrome-fg-muted: var(--fg-muted);
+  --chrome-fg-faint: var(--fg-faint);
+  --chrome-border: var(--border-default);
+  --chrome-hover: var(--surface-hover);
+  --chrome-active: var(--surface-active);
+
+  color-scheme: light;
+}
+
+/* ===== Tailwind v4 Theme Registration ===== */
+@theme {
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-input: var(--surface-input);
+  --color-surface-chrome: var(--surface-chrome);
+
+  --color-chrome-fg-primary: var(--chrome-fg-primary);
+  --color-chrome-fg-secondary: var(--chrome-fg-secondary);
+  --color-chrome-fg-muted: var(--chrome-fg-muted);
+  --color-chrome-fg-faint: var(--chrome-fg-faint);
+  --color-chrome-border: var(--chrome-border);
+  --color-chrome-hover: var(--chrome-hover);
+  --color-chrome-active: var(--chrome-active);
+
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-ghost: var(--fg-ghost);
+
+  --color-border-default: var(--border-default);
+  --color-border-light: var(--border-light);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-ring: var(--accent-ring);
+
+  --color-semantic-danger: var(--semantic-danger);
+  --color-semantic-danger-soft: var(--semantic-danger-soft);
+  --color-semantic-success: var(--semantic-success);
+
+  --color-overlay: var(--overlay);
+}
+
+/* ===== Global Accent for Checkboxes ===== */
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+/* ===== Theme Transition ===== */
+[data-theme] * {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+webview,
+input,
+textarea,
+[data-no-theme-transition] {
+  transition: none !important;
+}
+
+/* ===== macOS Window Drag ===== */
 .app-drag {
   -webkit-app-region: drag;
 }
@@ -8,7 +158,7 @@
   -webkit-app-region: no-drag;
 }
 
-/* Sidebar drag-and-drop reorder animations */
+/* ===== Sidebar drag-and-drop reorder animations ===== */
 .tab-list-move {
   transition: transform 200ms ease;
 }
