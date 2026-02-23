@@ -59,6 +59,18 @@ export const useUiStore = defineStore('ui', () => {
     editTabTargetId.value = null
   }
 
+  // --- Confirm remove tab dialog ---
+  const confirmRemoveTabDialogOpen = ref(false)
+  const confirmRemoveTabTargetId = ref<string | null>(null)
+  function openConfirmRemoveTabDialog(tabId: string): void {
+    confirmRemoveTabTargetId.value = tabId
+    confirmRemoveTabDialogOpen.value = true
+  }
+  function closeConfirmRemoveTabDialog(): void {
+    confirmRemoveTabDialogOpen.value = false
+    confirmRemoveTabTargetId.value = null
+  }
+
   // --- Context menu ---
   function showContextMenu(x: number, y: number, items: ContextMenuEntry[]): void {
     contextMenuX.value = x
@@ -286,6 +298,10 @@ export const useUiStore = defineStore('ui', () => {
     editGroupTargetId,
     editTabDialogOpen,
     editTabTargetId,
+    confirmRemoveTabDialogOpen,
+    confirmRemoveTabTargetId,
+    openConfirmRemoveTabDialog,
+    closeConfirmRemoveTabDialog,
     contextMenuVisible,
     contextMenuX,
     contextMenuY,

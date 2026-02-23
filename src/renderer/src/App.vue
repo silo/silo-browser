@@ -23,6 +23,9 @@ const EditTabDialog = defineAsyncComponent(
 const SettingsPage = defineAsyncComponent(
   () => import('@renderer/components/settings/SettingsPage.vue')
 )
+const ConfirmRemoveTabDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/ConfirmRemoveTabDialog.vue')
+)
 const UpdateDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/UpdateDialog.vue')
 )
@@ -60,6 +63,11 @@ onMounted(async () => {
   window.api.onUpdaterUpToDate(() => {
     uiStore.setUpdaterUpToDate()
   })
+
+  // Listen for Cmd/Ctrl+W from main process menu
+  window.api.onCloseTab(() => {
+    handleCloseTab()
+  })
 })
 
 onUnmounted(() => {
@@ -68,7 +76,16 @@ onUnmounted(() => {
   window.api.removeUpdateDownloadedListener()
   window.api.removeUpdaterFallbackAvailableListener()
   window.api.removeUpdaterUpToDateListener()
+  window.api.removeCloseTabListener()
 })
+
+function handleCloseTab(): void {
+  if (topbarStore.isChildActive) {
+    topbarStore.removeChildTab(topbarStore.activeTopbarTabId!)
+  } else if (groupsStore.activeTabId) {
+    uiStore.openConfirmRemoveTabDialog(groupsStore.activeTabId)
+  }
+}
 
 function handleKeydown(e: KeyboardEvent): void {
   const mod = e.metaKey || e.ctrlKey
@@ -85,15 +102,6 @@ function handleKeydown(e: KeyboardEvent): void {
   if (mod && e.key === 'n') {
     e.preventDefault()
     uiStore.openAddGroupDialog()
-    return
-  }
-
-  // Ctrl/Cmd+W — close active child tab (never closes primary sidebar tabs)
-  if (mod && e.key === 'w') {
-    e.preventDefault()
-    if (topbarStore.isChildActive) {
-      topbarStore.removeChildTab(topbarStore.activeTopbarTabId!)
-    }
     return
   }
 
@@ -148,6 +156,7 @@ function handleKeydown(e: KeyboardEvent): void {
     if (uiStore.addTabDialogOpen) { uiStore.closeAddTabDialog(); return }
     if (uiStore.editGroupDialogOpen) { uiStore.closeEditGroupDialog(); return }
     if (uiStore.editTabDialogOpen) { uiStore.closeEditTabDialog(); return }
+    if (uiStore.confirmRemoveTabDialogOpen) { uiStore.closeConfirmRemoveTabDialog(); return }
     if (uiStore.updateDialogOpen) { uiStore.closeUpdateDialog(); return }
     if (uiStore.urlBarOpen) { uiStore.closeUrlBar(); return }
     if (uiStore.settingsPageOpen) { uiStore.closeSettingsPage(); return }
@@ -166,5 +175,6 @@ function handleKeydown(e: KeyboardEvent): void {
   <AddTabDialog v-if="uiStore.addTabDialogOpen" />
   <EditGroupDialog v-if="uiStore.editGroupDialogOpen" />
   <EditTabDialog v-if="uiStore.editTabDialogOpen" />
+  <ConfirmRemoveTabDialog v-if="uiStore.confirmRemoveTabDialogOpen" />
   <UpdateDialog v-if="uiStore.updateDialogOpen" />
 </template>

@@ -27,6 +27,8 @@ export interface SiloApi {
   removeUpdaterFallbackAvailableListener: () => void
   onUpdaterUpToDate: (callback: () => void) => void
   removeUpdaterUpToDateListener: () => void
+  onCloseTab: (callback: () => void) => void
+  removeCloseTabListener: () => void
 }
 
 declare global {

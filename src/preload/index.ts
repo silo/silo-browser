@@ -57,6 +57,14 @@ const api = {
   },
   removeUpdaterUpToDateListener: (): void => {
     ipcRenderer.removeAllListeners('updater:up-to-date')
+  },
+  onCloseTab: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:close-tab', () => {
+      callback()
+    })
+  },
+  removeCloseTabListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:close-tab')
   }
 }
 

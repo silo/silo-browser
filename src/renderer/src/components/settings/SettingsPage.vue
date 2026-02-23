@@ -77,6 +77,10 @@ const shortcuts: { keys: string; description: string }[] = [
 
 const isCustomSurfaceColor = computed(() => uiStore.surfaceColor.startsWith('#'))
 
+function openWebsite(): void {
+  window.api.openExternal('https://silo.dev')
+}
+
 function onCustomSurfaceColor(event: Event): void {
   const hex = (event.target as HTMLInputElement).value
   uiStore.setSurfaceColor(hex)
@@ -357,6 +361,11 @@ function onCustomSurfaceColor(event: Event): void {
             About
           </h3>
           <p class="text-sm text-fg-faint">Silo v{{ appVersion }}</p>
+          <a
+            href="#"
+            @click.prevent="openWebsite"
+            class="text-sm text-accent hover:text-accent-hover transition-colors"
+          >silo.dev</a>
         </div>
       </div>
     </div>

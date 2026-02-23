@@ -145,9 +145,62 @@ app.on('web-contents-created', (_event, contents) => {
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.silo-browser')
 
+  app.setAboutPanelOptions({
+    applicationName: 'Silo Browser',
+    copyright: 'Copyright \u00A9 2025 silo.dev',
+    website: 'https://silo.dev'
+  })
+
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // Custom menu to prevent Cmd+W from closing the window
+  const menuTemplate: Electron.MenuItemConstructorOptions[] = [
+    ...(process.platform === 'darwin'
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
+      : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        {
+          label: 'Close Tab',
+          accelerator: 'CmdOrCtrl+W',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:close-tab')
+          }
+        }
+      ]
+    }
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate))
 
   loadState()
   const initialState = getCachedState()
