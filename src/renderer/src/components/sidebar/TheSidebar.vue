@@ -52,7 +52,7 @@ const isMac = window.api.platform === 'darwin'
             'p-1.5 rounded transition-colors',
             uiStore.settingsPageOpen
               ? 'bg-chrome-active text-chrome-fg-primary'
-              : 'text-chrome-fg-muted hover:text-chrome-fg-primary hover:bg-chrome-hover',
+              : 'text-chrome-fg-secondary hover:bg-chrome-hover/50',
             uiStore.sidebarExpanded ? 'ml-auto' : ''
           ]"
           title="Settings"
@@ -74,7 +74,7 @@ const isMac = window.api.platform === 'darwin'
         <!-- Sidebar collapse toggle -->
         <button
           @click="uiStore.toggleSidebar"
-          class="p-1.5 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
+          class="p-1.5 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
           :title="uiStore.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
         >
           <svg

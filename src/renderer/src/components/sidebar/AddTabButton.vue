@@ -9,7 +9,7 @@ const uiStore = useUiStore()
 <template>
   <button
     @click="uiStore.openAddTabDialog(props.groupId)"
-    class="flex items-center justify-center w-full px-2 py-1 text-chrome-fg-faint hover:text-chrome-fg-primary transition-colors"
+    class="flex items-center justify-center w-full px-2 py-1 text-chrome-fg-muted hover:text-chrome-fg-primary transition-colors"
     title="Add tab to group"
   >
     <svg

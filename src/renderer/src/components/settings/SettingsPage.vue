@@ -99,7 +99,7 @@ function onCustomSurfaceColor(event: Event): void {
     >
       <button
         @click="uiStore.closeSettingsPage()"
-        class="app-no-drag p-1 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
+        class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
         title="Back to browser"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">

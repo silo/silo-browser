@@ -191,15 +191,15 @@ export const useUiStore = defineStore('ui', () => {
       )
       document.documentElement.style.setProperty(
         '--chrome-fg-secondary',
-        isLight ? '#374151' : '#d1d5db'
+        isLight ? '#374151' : '#f3f4f6'
       )
       document.documentElement.style.setProperty(
         '--chrome-fg-muted',
-        isLight ? '#6b7280' : '#9ca3af'
+        isLight ? '#6b7280' : '#d1d5db'
       )
       document.documentElement.style.setProperty(
         '--chrome-fg-faint',
-        isLight ? '#9ca3af' : '#6b7280'
+        isLight ? '#9ca3af' : '#9ca3af'
       )
       document.documentElement.style.setProperty('--chrome-border', mixHex(surfaceHex, contrast, 0.12))
       document.documentElement.style.setProperty('--chrome-hover', mixHex(surfaceHex, contrast, 0.12))

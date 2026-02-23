@@ -24,6 +24,7 @@ Each group maintains its own cookies, localStorage, and session data — so you 
 | Keyboard shortcuts | Quick access to common actions — new tab, new group, reload, focus URL bar, switch tabs, and more. |
 | Emoji tab icons | Override a tab's favicon with any emoji character. |
 | Import / export config | Save your full setup (groups, tabs, settings) to a JSON file and restore it anytime. |
+| Themes | Dark, light, and system modes. Pick an accent color and a surface tint for the sidebar and navigation bar — or use a custom hex color. |
 | Auto-updater | The app checks for updates in the background and prompts you when a new version is ready. |
 | Cross-platform | Available for macOS, Windows, and Linux. |
 

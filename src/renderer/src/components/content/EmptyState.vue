@@ -29,7 +29,7 @@ const isMac = window.api.platform === 'darwin'
       <p class="text-base text-fg-muted mb-4">
         Your web apps, organized and isolated.
       </p>
-      <p class="text-sm text-fg-ghost">
+      <p class="text-sm text-fg-faint">
         Get started by adding a new group and tab in the sidebar.
       </p>
     </div>

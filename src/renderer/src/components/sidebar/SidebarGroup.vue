@@ -191,7 +191,7 @@ function handleDragLeave(e: DragEvent): void {
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
-          class="w-3 h-3 text-chrome-fg-muted shrink-0 transition-transform duration-150"
+          class="w-3 h-3 text-chrome-fg-secondary shrink-0 transition-transform duration-150"
           :class="group.isCollapsed ? '-rotate-90' : ''"
         >
           <path
@@ -225,7 +225,7 @@ function handleDragLeave(e: DragEvent): void {
       <button
         v-if="uiStore.sidebarExpanded"
         @click.stop="uiStore.openAddTabDialog(group.id)"
-        class="text-chrome-fg-faint hover:text-chrome-fg-primary text-sm leading-none shrink-0"
+        class="text-chrome-fg-muted hover:text-chrome-fg-primary text-sm leading-none shrink-0"
         title="Add tab"
       >
         +

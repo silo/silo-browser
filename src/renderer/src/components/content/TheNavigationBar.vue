@@ -127,7 +127,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
   >
     <button
       @click="goBack"
-      class="app-no-drag p-1 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       title="Back"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
@@ -137,7 +137,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
 
     <button
       @click="goForward"
-      class="app-no-drag p-1 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       title="Forward"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
@@ -147,7 +147,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
 
     <button
       @click="reload"
-      class="app-no-drag p-1 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
+      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
       title="Reload"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
@@ -162,7 +162,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
         'app-no-drag p-1 rounded transition-colors',
         topbarStore.currentChildTabs.length > 0 && !topbarStore.isChildActive
           ? 'bg-chrome-active text-chrome-fg-primary'
-          : 'text-chrome-fg-muted hover:text-chrome-fg-primary hover:bg-chrome-hover'
+          : 'text-chrome-fg-secondary hover:bg-chrome-hover/50'
       ]"
       title="Go to home URL"
     >
@@ -184,7 +184,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
           'flex items-center gap-1 px-2 py-0.5 text-xs rounded shrink-0 transition-colors',
           topbarStore.activeTopbarTabId === child.id
             ? 'bg-chrome-active text-chrome-fg-primary'
-            : 'text-chrome-fg-muted hover:bg-chrome-hover hover:text-chrome-fg-primary'
+            : 'text-chrome-fg-secondary hover:bg-chrome-hover/50'
         ]"
       >
         <button
@@ -207,7 +207,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
         </svg>
         <button
           @click.stop="topbarStore.removeChildTab(child.id)"
-          class="text-chrome-fg-faint hover:text-chrome-fg-primary shrink-0 leading-none"
+          class="text-chrome-fg-muted hover:text-chrome-fg-primary shrink-0 leading-none"
           title="Close tab"
         >
           &times;
@@ -232,7 +232,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
 
     <button
       @click="openExternal"
-      class="app-no-drag p-1 text-chrome-fg-muted hover:text-chrome-fg-primary rounded hover:bg-chrome-hover transition-colors"
+      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
       title="Open in default browser"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
