@@ -20,7 +20,7 @@ function createWindow(): BrowserWindow {
   const isLight =
     state.themeMode === 'light' ||
     (state.themeMode === 'system' && false) // system detection not available in main process, default dark
-  const bgColor = isLight ? '#f9fafb' : '#111827'
+  const bgColor = isLight ? '#f9fafb' : '#141414'
 
   const mainWindow = new BrowserWindow({
     width: 1200,

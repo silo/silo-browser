@@ -38,7 +38,7 @@ export interface ChildTab {
 
 export type ThemeMode = 'dark' | 'light' | 'system'
 export type AccentColor = 'blue' | 'green' | 'amber' | 'red' | 'violet' | 'pink' | 'cyan' | 'orange'
-export type SurfaceColor = 'default' | 'slate' | 'navy' | 'forest' | 'wine' | 'plum' | 'teal' | 'earth'
+export type SurfaceColor = 'default' | 'charcoal' | 'slate' | 'navy' | 'forest' | 'wine' | 'plum' | 'teal' | 'earth'
 
 export interface AppState {
   groups: GroupItem[]

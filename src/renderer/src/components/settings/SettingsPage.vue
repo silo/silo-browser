@@ -25,6 +25,7 @@ const accentPresets: { name: AccentColor; hex: string }[] = [
 
 const surfacePresets: { name: SurfaceColor; swatch: string | null }[] = [
   { name: 'default', swatch: null },
+  { name: 'charcoal', swatch: '#141414' },
   { name: 'slate', swatch: '#64748b' },
   { name: 'navy', swatch: '#6366f1' },
   { name: 'forest', swatch: '#22c55e' },
