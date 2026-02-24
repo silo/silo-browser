@@ -69,9 +69,19 @@ onMounted(async () => {
     uiStore.showPermissionRequest(data)
   })
 
-  // Listen for Cmd/Ctrl+W from main process menu
+  // Listen for menu shortcuts from main process
   window.api.onCloseTab(() => {
     handleCloseTab()
+  })
+  window.api.onNewGroup(() => {
+    uiStore.openAddGroupDialog()
+  })
+  window.api.onOpenSettings(() => {
+    if (uiStore.settingsPageOpen) {
+      uiStore.closeSettingsPage()
+    } else {
+      uiStore.openSettingsPage()
+    }
   })
 })
 
@@ -82,6 +92,8 @@ onUnmounted(() => {
   window.api.removeUpdaterFallbackAvailableListener()
   window.api.removeUpdaterUpToDateListener()
   window.api.removeCloseTabListener()
+  window.api.removeNewGroupListener()
+  window.api.removeOpenSettingsListener()
   window.api.removePermissionRequestListener()
 })
 

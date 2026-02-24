@@ -66,6 +66,22 @@ const api = {
   removeCloseTabListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:close-tab')
   },
+  onNewGroup: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:new-group', () => {
+      callback()
+    })
+  },
+  removeNewGroupListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:new-group')
+  },
+  onOpenSettings: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:open-settings', () => {
+      callback()
+    })
+  },
+  removeOpenSettingsListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:open-settings')
+  },
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void
   ): void => {

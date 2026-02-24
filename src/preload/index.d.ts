@@ -29,6 +29,10 @@ export interface SiloApi {
   removeUpdaterUpToDateListener: () => void
   onCloseTab: (callback: () => void) => void
   removeCloseTabListener: () => void
+  onNewGroup: (callback: () => void) => void
+  removeNewGroupListener: () => void
+  onOpenSettings: (callback: () => void) => void
+  removeOpenSettingsListener: () => void
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void
   ) => void

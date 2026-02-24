@@ -278,7 +278,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Custom menu to prevent Cmd+W from closing the window
+  // Full default menu with Cmd+W overridden to close tab instead of window
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     ...(process.platform === 'darwin'
       ? [
@@ -286,6 +286,8 @@ app.whenReady().then(() => {
             label: app.name,
             submenu: [
               { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'services' as const },
               { type: 'separator' as const },
               { role: 'hide' as const },
               { role: 'hideOthers' as const },
@@ -297,27 +299,56 @@ app.whenReady().then(() => {
         ]
       : []),
     {
-      label: 'Edit',
+      label: 'File',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        {
+          label: 'New Group',
+          accelerator: 'CmdOrCtrl+N',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:new-group')
+          }
+        },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
         {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click: (_item, win): void => {
             if (win) (win as BrowserWindow).webContents.send('shortcut:close-tab')
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Settings',
+          accelerator: 'CmdOrCtrl+,',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:open-settings')
+          }
+        }
+      ]
+    },
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Learn More',
+          click: (): void => {
+            shell.openExternal('https://silo.dev')
           }
         }
       ]
