@@ -13,6 +13,7 @@ export interface PersistedState {
   themeMode: string
   accentColor: string
   surfaceColor: string
+  grantedPermissions: string[] // "origin::permission" entries
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
@@ -28,7 +29,8 @@ const defaultState: PersistedState = {
   activeChildTabId: null,
   themeMode: 'dark',
   accentColor: 'blue',
-  surfaceColor: 'default'
+  surfaceColor: 'default',
+  grantedPermissions: []
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -66,7 +68,10 @@ export function loadState(): PersistedState {
         (VALID_SURFACE_COLORS.includes(parsed.surfaceColor) ||
           /^#[0-9a-fA-F]{6}$/.test(parsed.surfaceColor))
           ? parsed.surfaceColor
-          : 'default'
+          : 'default',
+      grantedPermissions: Array.isArray(parsed.grantedPermissions)
+        ? parsed.grantedPermissions.filter((p: unknown) => typeof p === 'string')
+        : []
     }
     cachedState = { ...state }
     return state

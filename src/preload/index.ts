@@ -65,6 +65,19 @@ const api = {
   },
   removeCloseTabListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:close-tab')
+  },
+  onPermissionRequest: (
+    callback: (data: { requestId: number; permission: string; origin: string }) => void
+  ): void => {
+    ipcRenderer.on('permission:request', (_event, data) => {
+      callback(data)
+    })
+  },
+  removePermissionRequestListener: (): void => {
+    ipcRenderer.removeAllListeners('permission:request')
+  },
+  respondToPermission: (requestId: number, granted: boolean): void => {
+    ipcRenderer.send('permission:response', { requestId, granted })
   }
 }
 

@@ -64,6 +64,11 @@ onMounted(async () => {
     uiStore.setUpdaterUpToDate()
   })
 
+  // Listen for permission requests from webview sessions
+  window.api.onPermissionRequest((data) => {
+    uiStore.showPermissionRequest(data)
+  })
+
   // Listen for Cmd/Ctrl+W from main process menu
   window.api.onCloseTab(() => {
     handleCloseTab()
@@ -77,6 +82,7 @@ onUnmounted(() => {
   window.api.removeUpdaterFallbackAvailableListener()
   window.api.removeUpdaterUpToDateListener()
   window.api.removeCloseTabListener()
+  window.api.removePermissionRequestListener()
 })
 
 function handleCloseTab(): void {

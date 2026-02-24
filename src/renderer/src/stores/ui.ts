@@ -237,6 +237,32 @@ export const useUiStore = defineStore('ui', () => {
     })
   }
 
+  // --- Permission request banner ---
+  const permissionRequest = ref<{
+    requestId: number
+    permission: string
+    origin: string
+  } | null>(null)
+
+  function showPermissionRequest(data: {
+    requestId: number
+    permission: string
+    origin: string
+  }): void {
+    // Deny any pending request before showing a new one
+    if (permissionRequest.value) {
+      window.api.respondToPermission(permissionRequest.value.requestId, false)
+    }
+    permissionRequest.value = data
+  }
+
+  function respondToPermission(granted: boolean): void {
+    if (permissionRequest.value) {
+      window.api.respondToPermission(permissionRequest.value.requestId, granted)
+      permissionRequest.value = null
+    }
+  }
+
   // --- URL bar modal ---
   const urlBarOpen = ref(false)
   function openUrlBar(): void {
@@ -319,6 +345,9 @@ export const useUiStore = defineStore('ui', () => {
     hideContextMenu,
     openLinksInNewTab,
     setOpenLinksInNewTab,
+    permissionRequest,
+    showPermissionRequest,
+    respondToPermission,
     urlBarOpen,
     openUrlBar,
     closeUrlBar,

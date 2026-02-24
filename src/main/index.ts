@@ -1,9 +1,18 @@
-import { app, shell, BrowserWindow, Menu, MenuItem, clipboard, nativeTheme } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  Menu,
+  MenuItem,
+  clipboard,
+  nativeTheme,
+  ipcMain
+} from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { initAutoUpdater } from './updater'
-import { getCachedState, loadState } from './store'
+import { getCachedState, loadState, saveState } from './store'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
@@ -51,9 +60,123 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+// Permissions that require explicit user consent
+const promptPermissions = new Set([
+  'media',
+  'geolocation',
+  'notifications',
+  'display-capture',
+  'midi',
+  'midiSysex'
+])
+
+// Permissions granted automatically (low-risk)
+const autoGrantPermissions = new Set([
+  'mediaKeySystem',
+  'clipboard-read',
+  'clipboard-sanitized-write',
+  'accessibility-events',
+  'window-management',
+  'local-fonts',
+  'speaker-selection',
+  'screen-wake-lock',
+  'idle-detection'
+])
+
+// Track sessions that already have permission handlers
+const handledSessions = new WeakSet<Electron.Session>()
+
+// Global set of user-granted permissions ("origin::permission"), persisted to disk
+const grantedPermissions = new Set<string>()
+
+function loadGrantedPermissions(): void {
+  const state = getCachedState()
+  for (const entry of state.grantedPermissions) {
+    grantedPermissions.add(entry)
+  }
+}
+
+function persistGrantedPermission(key: string): void {
+  grantedPermissions.add(key)
+  saveState({ grantedPermissions: [...grantedPermissions] })
+}
+
+// Pending permission request callbacks waiting for user response
+let permissionRequestId = 0
+const pendingPermissionCallbacks = new Map<number, (granted: boolean) => void>()
+
+ipcMain.on(
+  'permission:response',
+  (_event, { requestId, granted }: { requestId: number; granted: boolean }) => {
+    const callback = pendingPermissionCallbacks.get(requestId)
+    if (callback) {
+      callback(granted)
+      pendingPermissionCallbacks.delete(requestId)
+    }
+  }
+)
+
+function setupPermissionHandlers(ses: Electron.Session): void {
+  if (handledSessions.has(ses)) return
+  handledSessions.add(ses)
+
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (autoGrantPermissions.has(permission)) {
+      callback(true)
+      return
+    }
+
+    if (!promptPermissions.has(permission)) {
+      callback(false)
+      return
+    }
+
+    // Ask the user via renderer UI
+    let origin = ''
+    try {
+      origin = new URL(webContents.getURL()).origin
+    } catch {
+      origin = webContents.getURL()
+    }
+
+    // If already granted for this origin+permission, allow immediately
+    const key = `${origin}::${permission}`
+    if (grantedPermissions.has(key)) {
+      callback(true)
+      return
+    }
+
+    const requestId = ++permissionRequestId
+    pendingPermissionCallbacks.set(requestId, (granted) => {
+      if (granted) {
+        persistGrantedPermission(key)
+      }
+      callback(granted)
+    })
+
+    const win = BrowserWindow.getFocusedWindow()
+    if (win) {
+      win.webContents.send('permission:request', { requestId, permission, origin })
+    } else {
+      pendingPermissionCallbacks.delete(requestId)
+      callback(false)
+    }
+  })
+
+  ses.setPermissionCheckHandler((_webContents, permission) => {
+    // Allow check to pass for auto-granted and promptable permissions so websites
+    // proceed to the actual request (where our prompt banner handles grant/deny).
+    // Electron's check handler only returns boolean — no "prompt" state — so
+    // returning false here makes sites think permissions are permanently blocked.
+    return autoGrantPermissions.has(permission) || promptPermissions.has(permission)
+  })
+}
+
 // Intercept webview context menus and new-window requests
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    // Set up permission handlers for this webview's session
+    setupPermissionHandlers(contents.session)
     contents.setWindowOpenHandler(({ url }) => {
       const state = getCachedState()
       if (state.openLinksInNewTab) {
@@ -203,6 +326,7 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate))
 
   loadState()
+  loadGrantedPermissions()
   const initialState = getCachedState()
   nativeTheme.themeSource = initialState.themeMode as 'dark' | 'light' | 'system'
   registerIpcHandlers()

@@ -2,6 +2,7 @@
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import TheNavigationBar from './TheNavigationBar.vue'
+import PermissionBanner from './PermissionBanner.vue'
 import WebviewContainer from './WebviewContainer.vue'
 import ChildWebviewContainer from './ChildWebviewContainer.vue'
 import EmptyState from './EmptyState.vue'
@@ -13,6 +14,7 @@ const topbarStore = useTopbarTabsStore()
 <template>
   <div class="flex-1 flex flex-col min-w-0">
     <TheNavigationBar />
+    <PermissionBanner />
     <main class="flex-1 relative bg-surface-base">
       <EmptyState v-if="!groupsStore.activeTab" />
       <WebviewContainer
