@@ -5,7 +5,9 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(git log:*)",
+      "Bash(gh pr list:*)"
     ]
   }
 }
