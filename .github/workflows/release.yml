@@ -96,13 +96,13 @@ jobs:
         run: pnpm build
 
       - name: Package, sign and notarize (mac)
-        timeout-minutes: 60
+        timeout-minutes: 180
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          DEBUG: electron-builder,electron-osx-sign*,@electron/notarize*
+          DEBUG: electron-builder,electron-osx-sign*,@electron/notarize*,electron-publish*
           ELECTRON_BUILDER_LOG_LEVEL: debug
         run: pnpm exec electron-builder --mac --arm64 --publish always
 
