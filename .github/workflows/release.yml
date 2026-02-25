@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout
@@ -35,30 +35,83 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # macOS: import signing certificate into a dedicated keychain
-      - name: Import macOS signing certificate
-        if: matrix.os == 'macos-latest'
-        env:
-          P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12 }}
-          P12_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
-        run: |
-          echo "$P12_BASE64" | base64 --decode > /tmp/certificate.p12
-          security create-keychain -p "actions" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "actions" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security import /tmp/certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security list-keychains -d user -s build.keychain login.keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "actions" build.keychain
-          security find-identity -v -p codesigning build.keychain
-          rm /tmp/certificate.p12
-
       - name: Build and publish
         timeout-minutes: 60
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS notarization (CSC_LINK intentionally omitted — cert is in the keychain)
+        run: pnpm build && pnpm exec electron-builder --publish always
+
+  release-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Import macOS signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$HOME/Library/Keychains/build.keychain-db"
+          echo "$P12_BASE64" | base64 --decode > /tmp/certificate.p12
+          security create-keychain -p "actions" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "actions" "$KEYCHAIN_PATH"
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
+          security import /tmp/certificate.p12 -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "actions" "$KEYCHAIN_PATH"
+          security show-keychain-info "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          security find-certificate -a -c "Developer ID Application" -Z "$KEYCHAIN_PATH"
+          rm /tmp/certificate.p12
+
+      - name: Resolve signing identity
+        run: |
+          KEYCHAIN_PATH="$HOME/Library/Keychains/build.keychain-db"
+          IDENTITY_HASH=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk '/Developer ID Application/{print $2; exit}')
+          if [ -z "$IDENTITY_HASH" ]; then
+            echo "No Developer ID Application identity found in CI keychain"
+            exit 1
+          fi
+          echo "Using signing identity hash: $IDENTITY_HASH"
+          echo "CSC_NAME=$IDENTITY_HASH" >> "$GITHUB_ENV"
+
+      - name: Build app
+        run: pnpm build
+
+      - name: Package, sign and notarize (mac)
+        timeout-minutes: 60
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm build && pnpm exec electron-builder --publish always
+          DEBUG: electron-builder,electron-osx-sign*,@electron/notarize*
+          ELECTRON_BUILDER_LOG_LEVEL: debug
+        run: pnpm exec electron-builder --mac --arm64 --publish always
+
+      - name: Verify signed app
+        run: |
+          APP_PATH="dist/mac-arm64/Silo.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app not found at $APP_PATH"
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=4 "$APP_PATH"
+          spctl -a -vvv "$APP_PATH"
