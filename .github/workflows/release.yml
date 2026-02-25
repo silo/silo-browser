@@ -57,6 +57,6 @@ jobs:
           CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_P12 || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
           APPLE_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID || '' }}
-          APPLE_ID_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID_PASSWORD || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.os == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
         run: pnpm build && pnpm exec electron-builder --publish always
