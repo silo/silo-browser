@@ -139,7 +139,7 @@ jobs:
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Notarize mac zip with notarytool
-        timeout-minutes: 90
+        timeout-minutes: 210
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
@@ -156,17 +156,73 @@ jobs:
           fi
           echo "Submitting $ZIP_PATH for notarization"
           if [ "$NOTARY_AUTH_MODE" = "api-key" ]; then
-            xcrun notarytool submit "$ZIP_PATH" \
+            SUBMIT_JSON=$(xcrun notarytool submit "$ZIP_PATH" \
               --key "$APPLE_API_KEY_PATH" \
               --key-id "$APPLE_API_KEY_ID" \
               --issuer "$APPLE_API_ISSUER_ID" \
-              --wait --timeout 60m
+              --no-wait --output-format json)
           else
-            xcrun notarytool submit "$ZIP_PATH" \
+            SUBMIT_JSON=$(xcrun notarytool submit "$ZIP_PATH" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
-              --wait --timeout 60m
+              --no-wait --output-format json)
+          fi
+
+          echo "$SUBMIT_JSON"
+          SUBMISSION_ID=$(printf '%s' "$SUBMIT_JSON" | /usr/bin/python3 -c "import sys, json; print(json.load(sys.stdin).get('id',''))")
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "Failed to parse notarization submission id"
+            exit 1
+          fi
+          echo "Submission ID: $SUBMISSION_ID"
+
+          ACCEPTED=false
+          for attempt in $(seq 1 90); do
+            if [ "$NOTARY_AUTH_MODE" = "api-key" ]; then
+              INFO_JSON=$(xcrun notarytool info "$SUBMISSION_ID" \
+                --key "$APPLE_API_KEY_PATH" \
+                --key-id "$APPLE_API_KEY_ID" \
+                --issuer "$APPLE_API_ISSUER_ID" \
+                --output-format json)
+            else
+              INFO_JSON=$(xcrun notarytool info "$SUBMISSION_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                --output-format json)
+            fi
+
+            STATUS=$(printf '%s' "$INFO_JSON" | /usr/bin/python3 -c "import sys, json; print(json.load(sys.stdin).get('status','Unknown'))")
+            echo "Current status: $STATUS (attempt $attempt/90)"
+
+            if [ "$STATUS" = "Accepted" ]; then
+              ACCEPTED=true
+              break
+            fi
+
+            if [ "$STATUS" = "Invalid" ]; then
+              echo "Notarization failed. Fetching full notary log..."
+              if [ "$NOTARY_AUTH_MODE" = "api-key" ]; then
+                xcrun notarytool log "$SUBMISSION_ID" \
+                  --key "$APPLE_API_KEY_PATH" \
+                  --key-id "$APPLE_API_KEY_ID" \
+                  --issuer "$APPLE_API_ISSUER_ID"
+              else
+                xcrun notarytool log "$SUBMISSION_ID" \
+                  --apple-id "$APPLE_ID" \
+                  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                  --team-id "$APPLE_TEAM_ID"
+              fi
+              exit 1
+            fi
+
+            sleep 120
+          done
+
+          if [ "$ACCEPTED" != "true" ]; then
+            echo "Notarization did not complete within polling window (180 minutes)."
+            exit 124
           fi
 
       - name: Staple and verify signed app
