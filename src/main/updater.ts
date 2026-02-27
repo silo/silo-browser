@@ -6,9 +6,6 @@ import { join, dirname } from 'path'
 const logPath = join(app.getPath('userData'), 'updater.log')
 let mainWindow: BrowserWindow | null = null
 
-// State: tracks where we are in the update lifecycle
-let downloadedVersion: string | null = null
-let installFailed = false
 let fallbackDone = false
 
 async function log(level: 'INFO' | 'ERROR', msg: string): Promise<void> {
@@ -89,35 +86,20 @@ export function initAutoUpdater(win: BrowserWindow): void {
     log('INFO', `Download: ${p.percent.toFixed(1)}%`)
   })
 
-  // On macOS without code signing, a signature error fires ~500ms after download.
-  // We delay the "Restart Now" dialog so the error handler can intercept it and
-  // show the "Download from GitHub" fallback instead. With proper code signing,
-  // no error fires and the dialog appears after the delay.
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     log('INFO', `Downloaded: v${info.version}`)
-    downloadedVersion = info.version
-    setTimeout(() => {
-      if (!installFailed) send('updater:update-downloaded', info.version)
-    }, 1500)
+    send('updater:update-downloaded', info.version)
   })
 
   autoUpdater.on('error', (err: Error) => {
     log('ERROR', err.message)
-    if (downloadedVersion) {
-      // Error after download = install will fail (e.g. macOS code signature validation)
-      installFailed = true
-      send('updater:fallback-available', downloadedVersion)
-    } else {
-      fallbackCheck()
-    }
+    fallbackCheck()
   })
 
   checkForUpdates()
 }
 
 export function checkForUpdates(): void {
-  downloadedVersion = null
-  installFailed = false
   fallbackDone = false
   log('INFO', `Check starting (v${app.getVersion()})`)
   autoUpdater.checkForUpdates().catch((e) => {
