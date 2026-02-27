@@ -25,8 +25,6 @@ jobs:
             build_cmd: pnpm exec electron-builder --linux --publish always
           - os: windows-latest
             build_cmd: pnpm exec electron-builder --win --publish always
-          - os: macos-latest
-            build_cmd: pnpm exec electron-builder --mac --arm64 --publish always -c.mac.notarize=false
 
     steps:
       - name: Checkout
@@ -57,3 +55,85 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: ${{ matrix.build_cmd }}
+
+  release-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Import macOS signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+
+          # Decode certificate
+          echo "$P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          # Create and configure temporary keychain
+          security create-keychain -p "actions" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "actions" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          # Add to search list (prepend, keeping login keychain)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Allow codesign to access the key without UI prompt
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "actions" "$KEYCHAIN_PATH"
+
+          # Clean up cert file
+          rm -f "$CERT_PATH"
+
+          # Verify identity was imported
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Package, sign, notarize, and publish
+        timeout-minutes: 30
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm exec electron-builder --mac --arm64 --publish always
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          if security list-keychains | grep -q "build.keychain-db"; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
