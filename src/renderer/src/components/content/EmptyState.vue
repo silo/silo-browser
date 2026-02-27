@@ -1,15 +1,23 @@
 <script setup lang="ts">
+import { useUiStore } from '@renderer/stores/ui'
+
+const uiStore = useUiStore()
 const isMac = window.api.platform === 'darwin'
 </script>
 
 <template>
-  <div class="flex items-center justify-center h-full text-fg-faint relative">
-    <!-- macOS drag region when no nav bar is visible -->
+  <div class="absolute inset-0 flex flex-col bg-surface-chrome">
+    <!-- Empty topbar -->
     <div
-      v-if="isMac"
-      class="absolute top-0 left-0 right-0 h-10"
-      style="-webkit-app-region: drag"
+      :class="[
+        'shrink-0 h-10 border-b border-chrome-border',
+        isMac ? 'app-drag' : '',
+        isMac && !uiStore.sidebarExpanded ? 'pl-8' : ''
+      ]"
     />
+
+    <!-- Content -->
+    <div class="flex-1 flex items-center justify-center text-fg-faint">
     <div class="text-center">
       <svg
         width="128"
@@ -32,6 +40,7 @@ const isMac = window.api.platform === 'darwin'
       <p class="text-sm text-fg-faint">
         Get started by adding a new group and tab in the sidebar.
       </p>
+    </div>
     </div>
   </div>
 </template>

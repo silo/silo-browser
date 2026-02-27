@@ -35,7 +35,7 @@ const isMac = window.api.platform === 'darwin'
       </div>
     </div>
 
-    <div class="border-t border-chrome-border p-1">
+    <div class="border-t border-r border-chrome-border p-1">
       <div
         :class="
           uiStore.sidebarExpanded
