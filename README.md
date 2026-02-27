@@ -4,11 +4,13 @@ A desktop browser that organizes web apps into session-isolated groups.
 
 Each group maintains its own cookies, localStorage, and session data — so you can run multiple accounts for the same service side by side. Built with Electron, Vue 3, and TypeScript.
 
-![Silo Browser](screenshots/silo-browser-default.png)
+![Silo Browser](screenshots/silo-browser-1.png)
 
-![Silo Browser Tabs](screenshots/silo-browser-tabs.png)
+![Silo Browser](screenshots/silo-browser-2.png)
 
-<video src="https://github.com/user-attachments/assets/bfce7b76-9db2-4fd0-b482-40b874e04d3c"></video>
+![Silo Browser](screenshots/silo-browser-3.png)
+
+![Silo Browser](screenshots/silo-browser-4.png)
 
 ## Features
 
