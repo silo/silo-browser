@@ -93,7 +93,7 @@ export const useUiStore = defineStore('ui', () => {
 
   // --- Theme ---
   const themeMode = ref<ThemeMode>('dark')
-  const accentColor = ref<AccentColor>('blue')
+  const accentColor = ref<AccentColor>('gray')
   const surfaceColor = ref<string>('charcoal')
 
   const ACCENT_CONFIG: Record<AccentColor, { hue: number; saturation: number }> = {
@@ -104,10 +104,12 @@ export const useUiStore = defineStore('ui', () => {
     violet: { hue: 270, saturation: 75 },
     pink: { hue: 330, saturation: 80 },
     cyan: { hue: 190, saturation: 85 },
-    orange: { hue: 25, saturation: 92 }
+    orange: { hue: 25, saturation: 92 },
+    gray: { hue: 220, saturation: 8 }
   }
 
-  const SURFACE_COLOR_CONFIG: Record<Exclude<SurfaceColor, 'default'>, { dark: string; light: string }> = {
+  const SURFACE_COLOR_CONFIG: Record<SurfaceColor, { dark: string; light: string }> = {
+    neutral: { dark: '#1f2937', light: '#f3f4f6' },
     charcoal: { dark: '#141414', light: '#f5f5f5' },
     slate: { dark: '#1a2332', light: '#f0f4f8' },
     navy: { dark: '#1a1d33', light: '#edf0ff' },
@@ -167,10 +169,8 @@ export const useUiStore = defineStore('ui', () => {
 
     const sv = surfaceColor.value
     let surfaceHex: string | null = null
-    if (sv === 'default') {
-      document.documentElement.style.removeProperty('--surface-chrome')
-    } else if (sv in SURFACE_COLOR_CONFIG) {
-      const sc = SURFACE_COLOR_CONFIG[sv as Exclude<SurfaceColor, 'default'>]
+    if (sv in SURFACE_COLOR_CONFIG) {
+      const sc = SURFACE_COLOR_CONFIG[sv as SurfaceColor]
       surfaceHex = sc[effectiveTheme.value]
       document.documentElement.style.setProperty('--surface-chrome', surfaceHex)
     } else {
@@ -311,7 +311,7 @@ export const useUiStore = defineStore('ui', () => {
     sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
-    accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'blue'
+    accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
     applyTheme()
   }

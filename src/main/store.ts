@@ -17,8 +17,8 @@ export interface PersistedState {
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
-const VALID_ACCENT_COLORS = ['blue', 'green', 'amber', 'red', 'violet', 'pink', 'cyan', 'orange']
-const VALID_SURFACE_COLORS = ['default', 'slate', 'navy', 'forest', 'wine', 'plum', 'teal', 'earth']
+const VALID_ACCENT_COLORS = ['blue', 'green', 'amber', 'red', 'violet', 'pink', 'cyan', 'orange', 'gray']
+const VALID_SURFACE_COLORS = ['neutral', 'charcoal', 'slate', 'navy', 'forest', 'wine', 'plum', 'teal', 'earth']
 
 const defaultState: PersistedState = {
   groups: [],
@@ -28,8 +28,8 @@ const defaultState: PersistedState = {
   childTabs: [],
   activeChildTabId: null,
   themeMode: 'dark',
-  accentColor: 'blue',
-  surfaceColor: 'default',
+  accentColor: 'gray',
+  surfaceColor: 'charcoal',
   grantedPermissions: []
 }
 
@@ -62,13 +62,13 @@ export function loadState(): PersistedState {
       accentColor:
         typeof parsed.accentColor === 'string' && VALID_ACCENT_COLORS.includes(parsed.accentColor)
           ? parsed.accentColor
-          : 'blue',
+          : 'gray',
       surfaceColor:
         typeof parsed.surfaceColor === 'string' &&
         (VALID_SURFACE_COLORS.includes(parsed.surfaceColor) ||
           /^#[0-9a-fA-F]{6}$/.test(parsed.surfaceColor))
           ? parsed.surfaceColor
-          : 'default',
+          : 'charcoal',
       grantedPermissions: Array.isArray(parsed.grantedPermissions)
         ? parsed.grantedPermissions.filter((p: unknown) => typeof p === 'string')
         : []

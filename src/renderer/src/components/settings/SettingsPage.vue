@@ -13,26 +13,27 @@ const appVersion = ref('')
 const checkingForUpdates = ref(false)
 
 const accentPresets: { name: AccentColor; hex: string }[] = [
-  { name: 'blue', hex: '#3b82f6' },
-  { name: 'green', hex: '#10b981' },
-  { name: 'amber', hex: '#f59e0b' },
+  { name: 'gray', hex: '#6b7280' },
   { name: 'red', hex: '#ef4444' },
-  { name: 'violet', hex: '#8b5cf6' },
-  { name: 'pink', hex: '#ec4899' },
+  { name: 'orange', hex: '#f97316' },
+  { name: 'amber', hex: '#f59e0b' },
+  { name: 'green', hex: '#10b981' },
   { name: 'cyan', hex: '#06b6d4' },
-  { name: 'orange', hex: '#f97316' }
+  { name: 'blue', hex: '#3b82f6' },
+  { name: 'violet', hex: '#8b5cf6' },
+  { name: 'pink', hex: '#ec4899' }
 ]
 
-const surfacePresets: { name: SurfaceColor; swatch: string | null }[] = [
-  { name: 'default', swatch: null },
+const surfacePresets: { name: SurfaceColor; swatch: string }[] = [
   { name: 'charcoal', swatch: '#141414' },
+  { name: 'neutral', swatch: '#1f2937' },
+  { name: 'wine', swatch: '#e11d48' },
+  { name: 'earth', swatch: '#f59e0b' },
+  { name: 'forest', swatch: '#22c55e' },
+  { name: 'teal', swatch: '#14b8a6' },
   { name: 'slate', swatch: '#64748b' },
   { name: 'navy', swatch: '#6366f1' },
-  { name: 'forest', swatch: '#22c55e' },
-  { name: 'wine', swatch: '#e11d48' },
-  { name: 'plum', swatch: '#a855f7' },
-  { name: 'teal', swatch: '#14b8a6' },
-  { name: 'earth', swatch: '#f59e0b' }
+  { name: 'plum', swatch: '#a855f7' }
 ]
 
 onMounted(async () => {
@@ -95,7 +96,7 @@ function onCustomSurfaceColor(event: Event): void {
       :class="[
         'flex items-center gap-2 pr-2 py-1.5 bg-surface-chrome border-b border-chrome-border',
         isMac ? 'app-drag' : '',
-        isMac && !uiStore.sidebarExpanded ? 'pl-4' : 'pl-2'
+        isMac && !uiStore.sidebarExpanded ? 'pl-8' : 'pl-2'
       ]"
     >
       <button
@@ -104,7 +105,7 @@ function onCustomSurfaceColor(event: Event): void {
         title="Back to browser"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
         </svg>
       </button>
       <h1 class="app-no-drag text-sm font-medium text-chrome-fg-primary">Settings</h1>
@@ -177,19 +178,10 @@ function onCustomSurfaceColor(event: Event): void {
                       ? 'border-fg-primary scale-110'
                       : 'border-transparent'
                   "
-                  :style="preset.swatch ? { backgroundColor: preset.swatch } : {}"
+                  :style="{ backgroundColor: preset.swatch }"
                   :title="preset.name"
                   @click="uiStore.setSurfaceColor(preset.name)"
-                >
-                  <span
-                    v-if="!preset.swatch"
-                    class="flex items-center justify-center w-full h-full rounded-full bg-surface-raised border border-border-default text-fg-faint text-xs"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3">
-                      <path fill-rule="evenodd" d="M1 2.75A.75.75 0 011.75 2h16.5a.75.75 0 010 1.5H18v8.75A2.75 2.75 0 0115.25 15h-1.072l.798 3.06a.75.75 0 01-1.452.38L13.41 18H6.59l-.114.44a.75.75 0 01-1.452-.38L5.822 15H4.75A2.75 2.75 0 012 12.25V3.5h-.25A.75.75 0 011 2.75z" clip-rule="evenodd" />
-                    </svg>
-                  </span>
-                </button>
+                />
 
                 <!-- Custom color picker -->
                 <label
@@ -338,7 +330,7 @@ function onCustomSurfaceColor(event: Event): void {
               >
                 <path
                   fill-rule="evenodd"
-                  d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.397a.75.75 0 00-.75.75v3.834a.75.75 0 001.5 0v-2.09l.312.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm-10.624-2.85a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h3.834a.75.75 0 00.75-.75V3.334a.75.75 0 00-1.5 0v2.09l-.311-.31A7 7 0 002.83 8.252a.75.75 0 001.449.39z"
+                  d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
                   clip-rule="evenodd"
                 />
               </svg>

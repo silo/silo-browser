@@ -120,9 +120,9 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
   <div
     v-if="groupsStore.activeTab"
     :class="[
-      'flex items-center gap-1.5 pr-2 py-1.5 bg-surface-chrome border-b border-chrome-border',
+      'flex items-center gap-1.5 pr-2 py-2 bg-surface-chrome border-b border-chrome-border',
       isMac ? 'app-drag' : '',
-      isMac && !uiStore.sidebarExpanded ? 'pl-4' : 'pl-2'
+      isMac && !uiStore.sidebarExpanded ? 'pl-8' : 'pl-2'
     ]"
   >
     <button
@@ -131,7 +131,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       title="Back"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+        <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
       </svg>
     </button>
 
@@ -141,7 +141,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       title="Forward"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </button>
 
@@ -151,7 +151,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       title="Reload"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033l.312.311a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm-1.873-7.263a.75.75 0 00-1.5 0v2.033l-.312-.31A7 7 0 00.085 9.021a.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H8.614a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V4.161z" clip-rule="evenodd" />
+        <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd" />
       </svg>
     </button>
 
@@ -181,7 +181,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
         v-for="child in topbarStore.currentChildTabs"
         :key="child.id"
         :class="[
-          'flex items-center gap-1 px-2 py-0.5 text-xs rounded shrink-0 transition-colors',
+          'flex items-center gap-1 px-2 py-1.5 text-xs leading-none rounded shrink-0 transition-colors',
           topbarStore.activeTopbarTabId === child.id
             ? 'bg-chrome-active text-chrome-fg-primary'
             : 'text-chrome-fg-secondary hover:bg-chrome-hover/50'
@@ -221,7 +221,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
     <!-- URL bar button (compact) -->
     <button
       @click="openUrlBar"
-      class="app-no-drag flex items-center gap-1.5 px-2 py-1 bg-surface-input border border-border-light rounded text-sm text-fg-muted hover:text-fg-secondary hover:border-border-light transition-colors max-w-[240px]"
+      class="app-no-drag flex items-center gap-1.5 px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm leading-none text-chrome-fg-muted hover:text-chrome-fg-secondary hover:bg-chrome-hover transition-colors max-w-[240px]"
       title="Navigate to URL (Cmd+L)"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0">
@@ -236,7 +236,8 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       title="Open in default browser"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5zm7.25-.75a.75.75 0 01.75-.75h3.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0V6.31l-5.47 5.47a.75.75 0 11-1.06-1.06l5.47-5.47H12.25a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
+        <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
+        <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
       </svg>
     </button>
   </div>
@@ -249,12 +250,12 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       @click.self="closeUrlBar"
       @keydown.escape="closeUrlBar"
     >
-      <div class="bg-surface-raised rounded-lg shadow-2xl border border-border-light w-[560px] p-3">
+      <div class="bg-surface-chrome rounded-lg shadow-2xl border border-chrome-border w-[560px] p-3">
         <input
           ref="urlInputRef"
           v-model="urlInput"
           type="text"
-          class="nav-url-input w-full px-3 py-2 bg-surface-input border border-border-light rounded text-sm text-fg-secondary focus:outline-none focus:border-accent-soft focus:text-fg-primary"
+          class="nav-url-input w-full px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary focus:outline-none focus:border-accent-soft focus:text-chrome-fg-primary"
           placeholder="Enter URL and press Enter"
           @keydown.enter="navigateToUrl"
           @keydown.escape="closeUrlBar"

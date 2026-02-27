@@ -12,14 +12,14 @@ const isMac = window.api.platform === 'darwin'
 <template>
   <aside
     :class="[
-      'flex flex-col border-r border-chrome-border bg-surface-chrome transition-all duration-200 shrink-0',
+      'flex flex-col bg-surface-chrome transition-all duration-200 shrink-0',
       uiStore.sidebarExpanded ? 'w-52' : 'w-14'
     ]"
   >
     <!-- macOS traffic light spacer -->
-    <div v-if="isMac" class="h-9 shrink-0" style="-webkit-app-region: drag" />
+    <div v-if="isMac" class="h-10 shrink-0" style="-webkit-app-region: drag" />
 
-    <div class="flex-1 overflow-y-auto overflow-x-hidden py-2">
+    <div class="flex-1 overflow-y-auto overflow-x-hidden py-2 border-r border-chrome-border">
       <TransitionGroup tag="div" name="group-list">
         <SidebarGroup
           v-for="group in groupsStore.sortedGroups"
@@ -86,7 +86,7 @@ const isMac = window.api.platform === 'darwin'
           >
             <path
               fill-rule="evenodd"
-              d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+              d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
               clip-rule="evenodd"
             />
           </svg>
