@@ -26,7 +26,7 @@ jobs:
           - os: windows-latest
             build_cmd: pnpm exec electron-builder --win --publish always
           - os: macos-latest
-            build_cmd: pnpm exec electron-builder --mac --arm64 --publish always
+            build_cmd: pnpm exec electron-builder --mac --arm64 --publish always -c.mac.notarize=false
 
     steps:
       - name: Checkout
@@ -48,7 +48,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build and publish
+      - name: Build app
+        run: pnpm exec electron-vite build
+
+      - name: Package and publish
         timeout-minutes: 60
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
