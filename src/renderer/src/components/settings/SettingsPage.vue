@@ -90,7 +90,7 @@ function onCustomSurfaceColor(event: Event): void {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col min-w-0 bg-surface-base">
+  <div class="flex-1 flex flex-col min-w-0 bg-surface-chrome">
     <!-- Header bar -->
     <div
       :class="[
@@ -112,21 +112,21 @@ function onCustomSurfaceColor(event: Event): void {
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto text-chrome-fg-secondary">
       <div class="max-w-xl mx-auto py-8 px-6 space-y-8">
         <!-- Appearance section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             Appearance
           </h3>
           <div class="space-y-4">
             <!-- Theme mode selector -->
             <div>
-              <label class="block text-sm text-fg-muted mb-2">Theme</label>
+              <label class="block text-sm text-chrome-fg-muted mb-2">Theme</label>
               <div
-                class="flex bg-surface-input border border-border-default rounded overflow-hidden"
+                class="flex bg-chrome-hover/50 border border-chrome-border rounded overflow-hidden"
               >
                 <button
                   v-for="mode in (['dark', 'light', 'system'] as const)"
@@ -136,7 +136,7 @@ function onCustomSurfaceColor(event: Event): void {
                     'flex-1 py-2 text-sm capitalize transition-colors',
                     uiStore.themeMode === mode
                       ? 'bg-accent text-white'
-                      : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
+                      : 'text-chrome-fg-muted hover:text-chrome-fg-primary hover:bg-chrome-hover'
                   ]"
                 >
                   {{ mode }}
@@ -146,7 +146,7 @@ function onCustomSurfaceColor(event: Event): void {
 
             <!-- Accent color picker -->
             <div>
-              <label class="block text-sm text-fg-muted mb-2">Accent Color</label>
+              <label class="block text-sm text-chrome-fg-muted mb-2">Accent Color</label>
               <div class="flex gap-2">
                 <button
                   v-for="preset in accentPresets"
@@ -166,8 +166,8 @@ function onCustomSurfaceColor(event: Event): void {
 
             <!-- Surface color picker -->
             <div>
-              <label class="block text-sm text-fg-muted mb-1">Surface Color</label>
-              <p class="text-xs text-fg-faint mb-2">Tint for sidebar and navigation bar</p>
+              <label class="block text-sm text-chrome-fg-muted mb-1">Surface Color</label>
+              <p class="text-xs text-chrome-fg-faint mb-2">Tint for sidebar and navigation bar</p>
               <div class="flex gap-2">
                 <button
                   v-for="preset in surfacePresets"
@@ -202,7 +202,7 @@ function onCustomSurfaceColor(event: Event): void {
                   />
                   <span
                     v-if="!isCustomSurfaceColor"
-                    class="flex items-center justify-center w-full h-full rounded-full bg-surface-hover text-fg-faint"
+                    class="flex items-center justify-center w-full h-full rounded-full bg-chrome-hover text-chrome-fg-faint"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
                       <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
@@ -217,17 +217,17 @@ function onCustomSurfaceColor(event: Event): void {
         <!-- General section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             General
           </h3>
           <div class="space-y-3">
             <label
-              class="flex items-center justify-between px-3 py-2 bg-surface-input border border-border-default rounded cursor-pointer hover:border-border-light transition-colors"
+              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded cursor-pointer hover:border-accent transition-colors"
             >
               <div>
-                <span class="text-sm text-fg-secondary">Open links in new tab</span>
-                <p class="text-xs text-fg-faint mt-0.5">
+                <span class="text-sm text-chrome-fg-secondary">Open links in new tab</span>
+                <p class="text-xs text-chrome-fg-faint mt-0.5">
                   Links that open new windows will open as topbar tabs instead
                 </p>
               </div>
@@ -238,24 +238,46 @@ function onCustomSurfaceColor(event: Event): void {
                 class="w-4 h-4 cursor-pointer"
               />
             </label>
+
+            <label
+              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-accent transition-colors"
+            >
+              <div>
+                <span class="text-sm text-chrome-fg-secondary">Auto-sleep for new tabs</span>
+                <p class="text-xs text-chrome-fg-faint mt-0.5">
+                  Automatically suspend inactive tabs to save memory
+                </p>
+              </div>
+              <select
+                :value="uiStore.defaultSleepAfterMinutes"
+                @change="uiStore.setDefaultSleepAfterMinutes(Number(($event.target as HTMLSelectElement).value))"
+                class="px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary cursor-pointer focus:outline-none focus:border-accent"
+              >
+                <option :value="0">Never</option>
+                <option :value="30">30 min</option>
+                <option :value="60">1 hour</option>
+                <option :value="120">2 hours</option>
+                <option :value="240">4 hours</option>
+              </select>
+            </label>
           </div>
         </div>
 
         <!-- Keyboard Shortcuts section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             Keyboard Shortcuts
           </h3>
-          <div class="bg-surface-input border border-border-default rounded divide-y divide-border-default">
+          <div class="bg-chrome-hover/50 border border-chrome-border rounded divide-y divide-chrome-border">
             <div
               v-for="shortcut in shortcuts"
               :key="shortcut.keys"
               class="flex items-center justify-between px-3 py-2"
             >
-              <span class="text-sm text-fg-secondary">{{ shortcut.description }}</span>
-              <kbd class="text-xs text-fg-muted bg-surface-raised border border-border-default rounded px-1.5 py-0.5 font-mono">{{ shortcut.keys }}</kbd>
+              <span class="text-sm text-chrome-fg-secondary">{{ shortcut.description }}</span>
+              <kbd class="text-xs text-chrome-fg-muted bg-chrome-hover/50 border border-chrome-border rounded px-1.5 py-0.5 font-mono">{{ shortcut.keys }}</kbd>
             </div>
           </div>
         </div>
@@ -263,20 +285,20 @@ function onCustomSurfaceColor(event: Event): void {
         <!-- Data section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             Data
           </h3>
           <div class="space-y-2">
             <button
               @click="handleExport"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-surface-input border border-border-default rounded hover:border-border-light transition-colors text-sm text-fg-secondary"
+              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                class="w-4 h-4 text-fg-muted"
+                class="w-4 h-4 text-chrome-fg-muted"
               >
                 <path
                   d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"
@@ -289,13 +311,13 @@ function onCustomSurfaceColor(event: Event): void {
             </button>
             <button
               @click="handleImport"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-surface-input border border-border-default rounded hover:border-border-light transition-colors text-sm text-fg-secondary"
+              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                class="w-4 h-4 text-fg-muted"
+                class="w-4 h-4 text-chrome-fg-muted"
               >
                 <path
                   d="M9.25 13.25a.75.75 0 001.5 0V4.636l2.955 3.129a.75.75 0 001.09-1.03l-4.25-4.5a.75.75 0 00-1.09 0l-4.25 4.5a.75.75 0 101.09 1.03L9.25 4.636v8.614z"
@@ -312,7 +334,7 @@ function onCustomSurfaceColor(event: Event): void {
         <!-- Updates section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             Updates
           </h3>
@@ -320,13 +342,13 @@ function onCustomSurfaceColor(event: Event): void {
             <button
               @click="handleCheckForUpdates"
               :disabled="checkingForUpdates"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-surface-input border border-border-default rounded hover:border-border-light transition-colors text-sm text-fg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
-                class="w-4 h-4 text-fg-muted"
+                class="w-4 h-4 text-chrome-fg-muted"
               >
                 <path
                   fill-rule="evenodd"
@@ -349,11 +371,11 @@ function onCustomSurfaceColor(event: Event): void {
         <!-- About section -->
         <div>
           <h3
-            class="text-sm font-semibold text-fg-secondary uppercase tracking-wider mb-3"
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
           >
             About
           </h3>
-          <p class="text-sm text-fg-faint">Silo v{{ appVersion }}</p>
+          <p class="text-sm text-chrome-fg-faint">Silo v{{ appVersion }}</p>
           <a
             href="#"
             @click.prevent="openWebsite"

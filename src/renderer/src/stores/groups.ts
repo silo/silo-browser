@@ -122,6 +122,7 @@ export const useGroupsStore = defineStore('groups', () => {
       isLoaded: false,
       notificationsEnabled: true,
       notificationCount: 0,
+      sleepAfterMinutes: useUiStore().defaultSleepAfterMinutes,
       isMuted: false
     }
     group.tabs.push(tab)
@@ -148,7 +149,7 @@ export const useGroupsStore = defineStore('groups', () => {
   function updateTab(
     tabId: string,
     updates: Partial<
-      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted'>
+      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted' | 'sleepAfterMinutes'>
     >
   ): void {
     const tab = findTab(tabId)
@@ -159,10 +160,16 @@ export const useGroupsStore = defineStore('groups', () => {
   }
 
   function activateTab(tabId: string): void {
+    // Mark the previously active tab with a deactivation timestamp for sleep tracking
+    if (activeTabId.value && activeTabId.value !== tabId) {
+      const prev = findTab(activeTabId.value)
+      if (prev) prev.lastActiveAt = Date.now()
+    }
     const tab = findTab(tabId)
     if (tab) {
       tab.isLoaded = true
       tab.notificationCount = 0
+      tab.lastActiveAt = undefined // active tab never sleeps
       activeTabId.value = tabId
       useUiStore().closeSettingsPage()
       debouncedSave()
@@ -274,7 +281,8 @@ export const useGroupsStore = defineStore('groups', () => {
             iconEmoji: t.iconEmoji,
             order: t.order,
             notificationsEnabled: t.notificationsEnabled,
-            isMuted: t.isMuted
+            isMuted: t.isMuted,
+            sleepAfterMinutes: t.sleepAfterMinutes
           }))
         }
       })
@@ -293,6 +301,8 @@ export const useGroupsStore = defineStore('groups', () => {
         tab.notificationCount = tab.notificationCount ?? 0
         tab.notificationsEnabled = tab.notificationsEnabled ?? true
         tab.isMuted = tab.isMuted ?? false
+        tab.sleepAfterMinutes = tab.sleepAfterMinutes ?? 0
+        tab.lastActiveAt = Date.now()
       }
     }
     // Mark the active tab as loaded so its webview renders on startup
@@ -304,6 +314,39 @@ export const useGroupsStore = defineStore('groups', () => {
         activeTabId.value = null
       }
     }
+    // Auto-load tabs set to never sleep so their webviews are always active
+    for (const group of groups.value) {
+      for (const tab of group.tabs) {
+        if (tab.sleepAfterMinutes === 0 && !tab.isLoaded) {
+          tab.isLoaded = true
+        }
+      }
+    }
+    // Start sleep timer — checks every 60s for tabs that should be put to sleep
+    startSleepTimer()
+  }
+
+  let sleepTimerInterval: ReturnType<typeof setInterval> | null = null
+
+  function startSleepTimer(): void {
+    if (sleepTimerInterval) return
+    sleepTimerInterval = setInterval(() => {
+      const now = Date.now()
+      for (const group of groups.value) {
+        for (const tab of group.tabs) {
+          if (
+            tab.isLoaded &&
+            tab.sleepAfterMinutes > 0 &&
+            tab.id !== activeTabId.value &&
+            tab.lastActiveAt &&
+            now - tab.lastActiveAt >= tab.sleepAfterMinutes * 60_000
+          ) {
+            tab.isLoaded = false
+            useTopbarTabsStore().removeAllChildTabs(tab.id)
+          }
+        }
+      }
+    }, 60_000)
   }
 
   return {

@@ -18,6 +18,8 @@ const api = {
     ipcRenderer.invoke('store:save-theme', themeMode, accentColor, surfaceColor),
   saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null): Promise<void> =>
     ipcRenderer.invoke('store:save-child-tabs', childTabs, activeChildTabId),
+  saveDefaultSleepAfterMinutes: (value: number): Promise<void> =>
+    ipcRenderer.invoke('store:save-default-sleep-after-minutes', value),
   clearGroupSession: (groupId: string): Promise<void> =>
     ipcRenderer.invoke('store:clear-group-session', groupId),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
@@ -81,6 +83,14 @@ const api = {
   },
   removeOpenSettingsListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:open-settings')
+  },
+  onReloadTab: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:reload-tab', () => {
+      callback()
+    })
+  },
+  removeReloadTabListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:reload-tab')
   },
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void

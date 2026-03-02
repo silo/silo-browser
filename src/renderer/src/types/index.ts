@@ -9,6 +9,8 @@ export interface TabItem {
   isLoaded: boolean // Runtime-only, not persisted — tabs start unloaded on app restart
   notificationsEnabled: boolean
   notificationCount: number // Runtime-only
+  sleepAfterMinutes: number // 0 = never, 30, 60, 120, 240
+  lastActiveAt?: number // Runtime-only — timestamp of last deactivation
   currentUrl?: string // Runtime-only — tracks navigated URL
   currentTitle?: string // Runtime-only — tracks page title
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
@@ -50,6 +52,7 @@ export interface AppState {
   themeMode: ThemeMode
   accentColor: AccentColor
   surfaceColor: string // SurfaceColor preset name or custom hex (e.g. '#1a2332')
+  defaultSleepAfterMinutes: number
 }
 
 export interface ContextMenuItem {

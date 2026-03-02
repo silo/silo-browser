@@ -12,6 +12,7 @@ export interface SiloApi {
   saveOpenLinksInNewTab: (value: boolean) => Promise<void>
   saveTheme: (themeMode: string, accentColor: string, surfaceColor: string) => Promise<void>
   saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null) => Promise<void>
+  saveDefaultSleepAfterMinutes: (value: number) => Promise<void>
   clearGroupSession: (groupId: string) => Promise<void>
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>
@@ -33,6 +34,8 @@ export interface SiloApi {
   removeNewGroupListener: () => void
   onOpenSettings: (callback: () => void) => void
   removeOpenSettingsListener: () => void
+  onReloadTab: (callback: () => void) => void
+  removeReloadTabListener: () => void
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void
   ) => void

@@ -131,7 +131,42 @@
 
 /* ===== Global Accent for Checkboxes ===== */
 input[type='checkbox'] {
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid var(--chrome-border);
+  border-radius: 4px;
+  background-color: var(--surface-chrome);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+input[type='checkbox']:hover {
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+input[type='checkbox']:checked:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-soft);
+}
+
+input[type='checkbox']:checked::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-0.5px);
 }
 
 /* ===== Theme Transition ===== */

@@ -94,6 +94,13 @@ function handleContextMenu(e: MouseEvent): void {
 
   const items: ContextMenuEntry[] = [
     { label: 'Edit Tab...', action: () => uiStore.openEditTabDialog(props.tab.id) },
+    {
+      label: 'Refresh Favicon',
+      action: () => {
+        groupsStore.updateTab(props.tab.id, { iconUrl: undefined })
+        webview?.reload()
+      }
+    },
     { label: 'Reload', action: () => webview?.reload() },
     { separator: true },
     {

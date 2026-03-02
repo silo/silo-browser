@@ -83,6 +83,10 @@ onMounted(async () => {
       uiStore.openSettingsPage()
     }
   })
+  window.api.onReloadTab(() => {
+    const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+    wv?.reload()
+  })
 })
 
 onUnmounted(() => {
@@ -94,6 +98,7 @@ onUnmounted(() => {
   window.api.removeCloseTabListener()
   window.api.removeNewGroupListener()
   window.api.removeOpenSettingsListener()
+  window.api.removeReloadTabListener()
   window.api.removePermissionRequestListener()
 })
 

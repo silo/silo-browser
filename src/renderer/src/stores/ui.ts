@@ -85,10 +85,16 @@ export const useUiStore = defineStore('ui', () => {
 
   // --- App settings ---
   const openLinksInNewTab = ref(true)
+  const defaultSleepAfterMinutes = ref(0)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
     window.api.saveOpenLinksInNewTab(value)
+  }
+
+  function setDefaultSleepAfterMinutes(value: number): void {
+    defaultSleepAfterMinutes.value = value
+    window.api.saveDefaultSleepAfterMinutes(value)
   }
 
   // --- Theme ---
@@ -310,6 +316,7 @@ export const useUiStore = defineStore('ui', () => {
     const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
     sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
+    defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
@@ -346,6 +353,8 @@ export const useUiStore = defineStore('ui', () => {
     hideContextMenu,
     openLinksInNewTab,
     setOpenLinksInNewTab,
+    defaultSleepAfterMinutes,
+    setDefaultSleepAfterMinutes,
     permissionRequest,
     showPermissionRequest,
     respondToPermission,

@@ -10,6 +10,7 @@ const name = ref('')
 const url = ref('')
 const iconEmoji = ref('')
 const notificationsEnabled = ref(true)
+const sleepAfterMinutes = ref(0)
 
 watch(
   () => uiStore.editTabTargetId,
@@ -21,6 +22,7 @@ watch(
       url.value = tab.url
       iconEmoji.value = tab.iconEmoji ?? ''
       notificationsEnabled.value = tab.notificationsEnabled
+      sleepAfterMinutes.value = tab.sleepAfterMinutes ?? 0
     }
   },
   { immediate: true }
@@ -40,7 +42,8 @@ function submit(): void {
     name: trimmedName || trimmedUrl,
     url: finalUrl,
     iconEmoji: iconEmoji.value.trim() || undefined,
-    notificationsEnabled: notificationsEnabled.value
+    notificationsEnabled: notificationsEnabled.value,
+    sleepAfterMinutes: sleepAfterMinutes.value
   })
   close()
 }
@@ -86,7 +89,7 @@ function close(): void {
           maxlength="2"
         />
 
-        <label class="flex items-center gap-2 text-sm text-fg-muted mb-6 cursor-pointer">
+        <label class="flex items-center gap-2 text-sm text-fg-muted mb-4 cursor-pointer">
           <input
             v-model="notificationsEnabled"
             type="checkbox"
@@ -94,6 +97,18 @@ function close(): void {
           />
           Enable notifications
         </label>
+
+        <label class="block text-sm text-fg-muted mb-1">Auto-sleep</label>
+        <select
+          v-model.number="sleepAfterMinutes"
+          class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-6"
+        >
+          <option :value="0">Never</option>
+          <option :value="30">After 30 minutes</option>
+          <option :value="60">After 1 hour</option>
+          <option :value="120">After 2 hours</option>
+          <option :value="240">After 4 hours</option>
+        </select>
 
         <div class="flex justify-end gap-2">
           <button

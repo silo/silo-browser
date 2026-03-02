@@ -330,8 +330,20 @@ app.whenReady().then(() => {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
+        {
+          label: 'Reload Tab',
+          accelerator: 'CmdOrCtrl+R',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:reload-tab')
+          }
+        },
+        {
+          label: 'Force Reload Tab',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:reload-tab')
+          }
+        },
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'resetZoom' },

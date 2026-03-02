@@ -127,6 +127,7 @@ onUnmounted(() => {
       :data-child-tab-id="childTab.id"
       class="w-full h-full"
       allowpopups
+      webpreferences="backgroundThrottling=no"
     />
   </div>
 </template>

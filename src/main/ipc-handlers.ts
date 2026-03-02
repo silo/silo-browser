@@ -51,6 +51,13 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    'store:save-default-sleep-after-minutes',
+    async (_event, value: number) => {
+      await saveState({ defaultSleepAfterMinutes: value })
+    }
+  )
+
   ipcMain.handle('store:clear-group-session', async (_event, groupId: string) => {
     const partition = `persist:silo-group-${groupId}`
     const ses = session.fromPartition(partition)

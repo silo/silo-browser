@@ -20,7 +20,7 @@ const handleFaviconUpdated = ((e: Event) => {
   const evt = e as Event & { favicons: string[] }
   if (evt.favicons?.length > 0) {
     const tab = groupsStore.findTab(props.tab.id)
-    if (tab && !tab.iconUrl) {
+    if (tab) {
       tab.iconUrl = evt.favicons[0]
     }
   }
@@ -135,6 +135,7 @@ onUnmounted(() => {
       :data-tab-id="tab.id"
       class="w-full h-full"
       allowpopups
+      webpreferences="backgroundThrottling=no"
     />
   </div>
 </template>
