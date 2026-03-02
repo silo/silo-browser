@@ -21,6 +21,7 @@ Each group maintains its own cookies, localStorage, and session data — so you 
 | Child tabs | Links that open in new windows stay inside the app as topbar tabs, scoped to the parent tab. |
 | Custom user agent | Set a custom user-agent string per group so sites see a different browser identity. |
 | Notification badges | Tabs show a red badge count when they receive notifications in the background. Per-tab notification toggle. |
+| Auto-sleep | Tabs can automatically suspend after a period of inactivity to save memory. Configurable per tab (Never / 30 min / 1 hr / 2 hr / 4 hr) with a global default for new tabs in Settings. Tabs set to "Never" stay loaded on startup. |
 | Tab mute | Mute audio on any tab. A speaker icon indicates when a tab is playing audio. |
 | Collapsible sidebar | Expand or collapse the sidebar to icon-only mode. State persists across sessions. |
 | Keyboard shortcuts | Quick access to common actions — new tab, new group, reload, focus URL bar, switch tabs, and more. |
