@@ -6,7 +6,8 @@ import {
   MenuItem,
   clipboard,
   nativeTheme,
-  ipcMain
+  ipcMain,
+  webContents
 } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -326,7 +327,28 @@ app.whenReady().then(() => {
         }
       ]
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        {
+          label: 'Paste and Match Style',
+          accelerator: 'CmdOrCtrl+Shift+V',
+          click: (): void => {
+            const focused = webContents.getAllWebContents().find((wc) => wc.isFocused())
+            if (focused) focused.pasteAndMatchStyle()
+          }
+        },
+        { role: 'delete' },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      ]
+    },
     {
       label: 'View',
       submenu: [
