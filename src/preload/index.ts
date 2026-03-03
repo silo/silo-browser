@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { join } from 'path'
 import { electronAPI } from '@electron-toolkit/preload'
 
 const api = {
   platform: process.platform as string,
+  webviewPreloadPath: `file://${join(__dirname, 'webview.js')}`,
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
   getState: (): Promise<unknown> => ipcRenderer.invoke('store:get-state'),
   saveGroups: (groups: unknown): Promise<void> => ipcRenderer.invoke('store:save-groups', groups),

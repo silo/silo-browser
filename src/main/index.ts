@@ -173,12 +173,53 @@ function setupPermissionHandlers(ses: Electron.Session): void {
   })
 }
 
+// ── External protocol handling helpers ───────────────────────────────────────
+// A URL is "external" if it isn't a standard web/internal scheme.
+const INTERNAL_PROTOCOL_RE = /^(https?:\/\/|about:|chrome:|devtools:|file:|javascript:|data:|blob:)/i
+
+function isExternalProtocol(url: string): boolean {
+  return !!url && !INTERNAL_PROTOCOL_RE.test(url)
+}
+
+// Simple dedup — multiple layers may fire for the same protocol URL.
+// Only one URL is ever "in flight" at a time, so a single slot suffices.
+let lastExternalUrl = ''
+let lastExternalTime = 0
+function openExternalDedup(url: string): void {
+  const now = Date.now()
+  if (url === lastExternalUrl && now - lastExternalTime < 3000) return
+  lastExternalUrl = url
+  lastExternalTime = now
+  shell.openExternal(url).catch(() => {})
+}
+
+// Webview preloads send protocol URLs here via ipcRenderer.send
+ipcMain.on('silo:open-external-protocol', (_event, url: string) => {
+  if (url && typeof url === 'string') openExternalDedup(url)
+})
+
 // Intercept webview context menus and new-window requests
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     // Set up permission handlers for this webview's session
     setupPermissionHandlers(contents.session)
+
+    // ── External protocol handling (mailto:, tel:, msteams://, zoommtg://, etc.) ──
+    // Multiple redundant layers to catch protocol URLs and open them via the OS.
+
+    // Layer 1: Electron-level navigation events
+    contents.on('will-navigate', (event, url) => {
+      if (isExternalProtocol(url)) {
+        event.preventDefault()
+        openExternalDedup(url)
+      }
+    })
+
     contents.setWindowOpenHandler(({ url }) => {
+      if (isExternalProtocol(url)) {
+        openExternalDedup(url)
+        return { action: 'deny' }
+      }
       const state = getCachedState()
       if (state.openLinksInNewTab) {
         const win = BrowserWindow.getFocusedWindow()
@@ -195,20 +236,23 @@ app.on('web-contents-created', (_event, contents) => {
       const menu = new Menu()
 
       if (params.linkURL) {
-        menu.append(
-          new MenuItem({
-            label: 'Open Link in New Tab',
-            click: () => {
-              const win = BrowserWindow.getFocusedWindow()
-              if (win) {
-                win.webContents.send('webview-context:open-in-new-tab', params.linkURL)
+        const isProtocolLink = isExternalProtocol(params.linkURL)
+        if (!isProtocolLink) {
+          menu.append(
+            new MenuItem({
+              label: 'Open Link in New Tab',
+              click: () => {
+                const win = BrowserWindow.getFocusedWindow()
+                if (win) {
+                  win.webContents.send('webview-context:open-in-new-tab', params.linkURL)
+                }
               }
-            }
-          })
-        )
+            })
+          )
+        }
         menu.append(
           new MenuItem({
-            label: 'Open in Default Browser',
+            label: isProtocolLink ? 'Open in App' : 'Open in Default Browser',
             click: () => {
               shell.openExternal(params.linkURL)
             }

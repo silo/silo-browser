@@ -19,6 +19,7 @@ const webviewRef = ref<Electron.WebviewTag | null>(null)
 const parentTab = computed(() => groupsStore.findTab(props.childTab.parentTabId))
 
 const partition = computed(() => `persist:silo-group-${props.childTab.groupId}`)
+const webviewPreload = window.api.webviewPreloadPath
 
 const handleFaviconUpdated = ((e: Event) => {
   const evt = e as Event & { favicons: string[] }
@@ -40,6 +41,13 @@ const handleDidNavigateInPage = ((e: Event) => {
 const handleTitleUpdated = ((e: Event) => {
   const evt = e as Event & { title: string }
   topbarStore.setChildCurrentTitle(props.childTab.id, evt.title)
+}) as EventListener
+
+const handleIpcMessage = ((e: Event) => {
+  const evt = e as Event & { channel: string; args: unknown[] }
+  if (evt.channel === 'silo:open-external' && evt.args?.[0]) {
+    window.api.openExternal(evt.args[0] as string)
+  }
 }) as EventListener
 
 const handleDidFailLoad = ((e: Event) => {
@@ -94,6 +102,7 @@ onMounted(() => {
   wv.addEventListener('did-navigate', handleDidNavigate)
   wv.addEventListener('did-navigate-in-page', handleDidNavigateInPage)
   wv.addEventListener('page-title-updated', handleTitleUpdated)
+  wv.addEventListener('ipc-message', handleIpcMessage)
   wv.addEventListener('did-fail-load', handleDidFailLoad)
   wv.addEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.addEventListener('media-paused', handleMediaPaused)
@@ -109,6 +118,7 @@ onUnmounted(() => {
   wv.removeEventListener('did-navigate', handleDidNavigate)
   wv.removeEventListener('did-navigate-in-page', handleDidNavigateInPage)
   wv.removeEventListener('page-title-updated', handleTitleUpdated)
+  wv.removeEventListener('ipc-message', handleIpcMessage)
   wv.removeEventListener('did-fail-load', handleDidFailLoad)
   wv.removeEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.removeEventListener('media-paused', handleMediaPaused)
@@ -124,6 +134,7 @@ onUnmounted(() => {
       ref="webviewRef"
       :src="childTab.url"
       :partition="partition"
+      :preload="webviewPreload"
       :data-child-tab-id="childTab.id"
       class="w-full h-full"
       allowpopups

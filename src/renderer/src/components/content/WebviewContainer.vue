@@ -15,6 +15,7 @@ const { registerMain, unregisterMain } = useWebviewRegistry()
 const webviewRef = ref<Electron.WebviewTag | null>(null)
 
 const partition = computed(() => `persist:silo-group-${props.tab.groupId}`)
+const webviewPreload = window.api.webviewPreloadPath
 
 const handleFaviconUpdated = ((e: Event) => {
   const evt = e as Event & { favicons: string[] }
@@ -42,9 +43,11 @@ const handleTitleUpdated = ((e: Event) => {
 }) as EventListener
 
 const handleIpcMessage = ((e: Event) => {
-  const evt = e as Event & { channel: string }
+  const evt = e as Event & { channel: string; args: unknown[] }
   if (evt.channel === 'notification') {
     groupsStore.incrementNotification(props.tab.id)
+  } else if (evt.channel === 'silo:open-external' && evt.args?.[0]) {
+    window.api.openExternal(evt.args[0] as string)
   }
 }) as EventListener
 
@@ -132,6 +135,7 @@ onUnmounted(() => {
       ref="webviewRef"
       :src="tab.url"
       :partition="partition"
+      :preload="webviewPreload"
       :data-tab-id="tab.id"
       class="w-full h-full"
       allowpopups

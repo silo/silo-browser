@@ -3,6 +3,7 @@ import type { AppState, GroupItem } from '../renderer/src/types'
 
 export interface SiloApi {
   platform: string
+  webviewPreloadPath: string
   getAppVersion: () => Promise<string>
   getState: () => Promise<AppState>
   saveGroups: (groups: GroupItem[]) => Promise<void>
