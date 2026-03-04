@@ -434,6 +434,12 @@ app.whenReady().then(() => {
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate))
 
+  // Strip "Electron/X.X.X" and app name from the default User Agent so sites
+  // like WhatsApp, which check for "Chrome 85+", see a normal Chrome UA.
+  app.userAgentFallback = app.userAgentFallback
+    .replace(/\s+Electron\/\S+/, '')
+    .replace(/\s+silo-browser\/\S+/i, '')
+
   loadState()
   loadGrantedPermissions()
   const initialState = getCachedState()

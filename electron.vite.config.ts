@@ -14,7 +14,13 @@ export default defineConfig({
   },
   preload: {
     build: {
-      sourcemap: false
+      sourcemap: false,
+      rollupOptions: {
+        input: {
+          index: resolve('src/preload/index.ts'),
+          webview: resolve('src/preload/webview.ts')
+        }
+      }
     }
   },
   renderer: {

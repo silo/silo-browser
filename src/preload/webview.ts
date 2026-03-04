@@ -1,5 +1,10 @@
 import { ipcRenderer } from 'electron'
 
+// Prevent web content from stealing OS-level focus.
+// In a real browser, window.focus() is a no-op for background tabs.
+// Web apps (Teams, Outlook, etc.) call this on new messages/notifications.
+window.focus = () => {}
+
 const INTERNAL_RE = /^(https?:\/\/|javascript:|#|about:|chrome:|data:|blob:)/i
 
 function isExternal(url: string): boolean {

@@ -184,6 +184,16 @@ textarea,
   transition: none !important;
 }
 
+/* ===== Prevent select-all from highlighting app chrome ===== */
+body {
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
 /* ===== macOS Window Drag ===== */
 .app-drag {
   -webkit-app-region: drag;

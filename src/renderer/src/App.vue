@@ -113,6 +113,17 @@ function handleCloseTab(): void {
 function handleKeydown(e: KeyboardEvent): void {
   const mod = e.metaKey || e.ctrlKey
 
+  // Ctrl/Cmd+A — select all within active webview, not the whole app
+  if (mod && e.key === 'a') {
+    const active = document.activeElement
+    if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) {
+      e.preventDefault()
+      const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+      if (wv) wv.selectAll()
+    }
+    return
+  }
+
   // Ctrl/Cmd+T — open add tab dialog for first group
   if (mod && e.key === 't') {
     e.preventDefault()
