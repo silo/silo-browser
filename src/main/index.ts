@@ -198,6 +198,26 @@ ipcMain.on('silo:open-external-protocol', (_event, url: string) => {
   if (url && typeof url === 'string') openExternalDedup(url)
 })
 
+// Webview preloads override window.open() and route URLs here via IPC.
+// This prevents Electron's internal popup handling from activating the
+// parent BrowserWindow (which causes focus stealing from background).
+ipcMain.on('silo:window-open', (_event, url: string) => {
+  if (!url || typeof url !== 'string') return
+  if (isExternalProtocol(url)) {
+    openExternalDedup(url)
+    return
+  }
+  const state = getCachedState()
+  if (state.openLinksInNewTab) {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      win.webContents.send('webview-context:open-in-new-tab', url)
+    }
+  } else {
+    shell.openExternal(url)
+  }
+})
+
 // Intercept webview context menus and new-window requests
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
@@ -222,7 +242,9 @@ app.on('web-contents-created', (_event, contents) => {
       }
       const state = getCachedState()
       if (state.openLinksInNewTab) {
-        const win = BrowserWindow.getFocusedWindow()
+        // Use getAllWindows()[0] instead of getFocusedWindow() so URLs are
+        // still routed correctly when the window is in the background
+        const win = BrowserWindow.getAllWindows()[0]
         if (win) {
           win.webContents.send('webview-context:open-in-new-tab', url)
         }
@@ -440,6 +462,13 @@ app.whenReady().then(() => {
     .replace(/\s+Electron\/\S+/, '')
     .replace(/\s+silo-browser\/\S+/i, '')
 
+  // Synchronous IPC so webview preloads can check if the window is focused
+  // (used to suppress JS dialogs that would steal focus from background)
+  ipcMain.on('silo:is-window-focused', (event) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    event.returnValue = win ? win.isFocused() : false
+  })
+
   loadState()
   loadGrantedPermissions()
   const initialState = getCachedState()
@@ -447,6 +476,33 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   const mainWindow = createWindow()
   setTimeout(() => initAutoUpdater(mainWindow), 3000)
+
+  // ── FOCUS GUARD ──
+  // Prevent the BrowserWindow from being shown/focused by Electron internals
+  // when the app is in the background. We monkey-patch mainWindow.show() so
+  // only the initial ready-to-show call goes through. Subsequent show() calls
+  // while blurred are suppressed. The user can still switch to the app via
+  // Cmd+Tab or clicking because macOS handles that at the window-server level,
+  // bypassing BrowserWindow.show().
+  let _appBlurred = false
+  let _initialShowDone = false
+
+  const _origShow = mainWindow.show.bind(mainWindow)
+  mainWindow.show = function () {
+    if (_initialShowDone && _appBlurred) {
+      return
+    }
+    _initialShowDone = true
+    _origShow()
+  }
+
+  mainWindow.on('blur', () => {
+    _appBlurred = true
+  })
+
+  mainWindow.on('focus', () => {
+    _appBlurred = false
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

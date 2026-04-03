@@ -5,6 +5,70 @@ import { ipcRenderer } from 'electron'
 // Web apps (Teams, Outlook, etc.) call this on new messages/notifications.
 window.focus = () => {}
 
+// Block JS dialogs (alert/confirm/prompt) when the window is unfocused.
+// These cause Electron to bring the window to the foreground via native dialogs.
+const _origAlert = window.alert.bind(window)
+const _origConfirm = window.confirm.bind(window)
+const _origPrompt = window.prompt.bind(window)
+
+function _isWindowFocused(): boolean {
+  try {
+    return ipcRenderer.sendSync('silo:is-window-focused')
+  } catch {
+    return true // fail-open so dialogs aren't broken if IPC fails
+  }
+}
+
+window.alert = function (message?: string) {
+  if (!_isWindowFocused()) {
+    return undefined
+  }
+  return _origAlert(message)
+}
+
+window.confirm = function (message?: string): boolean {
+  if (!_isWindowFocused()) {
+    return false
+  }
+  return _origConfirm(message)
+}
+
+window.prompt = function (message?: string, defaultValue?: string): string | null {
+  if (!_isWindowFocused()) {
+    return null
+  }
+  return _origPrompt(message, defaultValue)
+}
+
+// Override window.open() in the isolated world (catches calls from preload context).
+// The main world override is in the notification injection script (executeJavaScript).
+window.open = function (url?: string | URL, _target?: string, _features?: string) {
+  const urlStr = url?.toString() ?? ''
+  if (urlStr) {
+    ipcRenderer.send('silo:window-open', urlStr)
+  }
+  return null
+}
+
+// Listen for window.open() calls relayed from the main world via postMessage.
+// The notification injection script overrides window.open() in the main world
+// and posts a message here since it can't access ipcRenderer directly.
+window.addEventListener('message', (e) => {
+  if (e.data?.type === '__silo_window_open' && e.data.url) {
+    ipcRenderer.send('silo:window-open', e.data.url)
+  }
+})
+
+// Lock focus/alert/confirm/prompt/open against reassignment by web content
+for (const name of ['focus', 'alert', 'confirm', 'prompt', 'open'] as const) {
+  const current = window[name]
+  Object.defineProperty(window, name, {
+    get: () => current,
+    set: () => {},
+    configurable: false
+  })
+}
+
 const INTERNAL_RE = /^(https?:\/\/|javascript:|#|about:|chrome:|data:|blob:)/i
 
 function isExternal(url: string): boolean {
