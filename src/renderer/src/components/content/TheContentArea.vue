@@ -6,6 +6,7 @@ import PermissionBanner from './PermissionBanner.vue'
 import WebviewContainer from './WebviewContainer.vue'
 import ChildWebviewContainer from './ChildWebviewContainer.vue'
 import EmptyState from './EmptyState.vue'
+import LinkStatusBar from './LinkStatusBar.vue'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
@@ -29,6 +30,7 @@ const topbarStore = useTopbarTabsStore()
         :child-tab="child"
         :is-active="child.id === topbarStore.activeTopbarTabId && child.parentTabId === groupsStore.activeTabId"
       />
+      <LinkStatusBar />
     </main>
   </div>
 </template>

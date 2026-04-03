@@ -1,12 +1,19 @@
-export function getNotificationInjectionScript(enabled: boolean): string {
+export function getNotificationInjectionScript(enabled: boolean, tabId?: string): string {
   return `
     (() => {
       if (window.__siloNotifWrapped) return;
       window.__siloNotifEnabled = ${enabled};
+      ${tabId ? `window.__siloTabId = '${tabId}'; document.documentElement.dataset.siloTabId = '${tabId}';` : ''}
       const OrigNotification = window.Notification;
       const SiloNotification = function(title, options) {
         if (!window.__siloNotifEnabled) return {};
-        return new OrigNotification(title, options);
+        const notif = new OrigNotification(title, options);
+        if (window.__siloTabId) {
+          notif.addEventListener('click', () => {
+            window.postMessage({ type: '__silo_notification_click', tabId: window.__siloTabId }, '*');
+          });
+        }
+        return notif;
       };
       SiloNotification.requestPermission = () => {
         return OrigNotification.requestPermission.call(OrigNotification);

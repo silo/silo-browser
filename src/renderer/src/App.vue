@@ -87,6 +87,11 @@ onMounted(async () => {
     const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
     wv?.reload()
   })
+
+  // Zoom shortcuts
+  window.api.onZoomIn(() => applyZoom(0.5))
+  window.api.onZoomOut(() => applyZoom(-0.5))
+  window.api.onZoomReset(() => applyZoom(0, true))
 })
 
 onUnmounted(() => {
@@ -99,12 +104,23 @@ onUnmounted(() => {
   window.api.removeNewGroupListener()
   window.api.removeOpenSettingsListener()
   window.api.removeReloadTabListener()
+  window.api.removeZoomInListener()
+  window.api.removeZoomOutListener()
+  window.api.removeZoomResetListener()
   window.api.removePermissionRequestListener()
 })
 
+function applyZoom(delta: number, reset = false): void {
+  const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+  if (!wv) return
+  const newLevel = reset ? 0 : wv.getZoomLevel() + delta
+  wv.setZoomLevel(newLevel)
+  if (groupsStore.activeTabId) groupsStore.setTabZoomLevel(groupsStore.activeTabId, newLevel)
+}
+
 function handleCloseTab(): void {
   if (topbarStore.isChildActive) {
-    topbarStore.removeChildTab(topbarStore.activeTopbarTabId!)
+    uiStore.openConfirmRemoveTabDialog(topbarStore.activeTopbarTabId!, true)
   } else if (groupsStore.activeTabId) {
     uiStore.openConfirmRemoveTabDialog(groupsStore.activeTabId)
   }

@@ -7,7 +7,8 @@ import {
   clipboard,
   nativeTheme,
   ipcMain,
-  webContents
+  webContents,
+  webFrameMain
 } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -218,11 +219,53 @@ ipcMain.on('silo:window-open', (_event, url: string) => {
   }
 })
 
+// Notification click — bring window to foreground
+ipcMain.on('silo:notification-click', (_event, tabId: string) => {
+  if (!tabId || typeof tabId !== 'string') return
+  const win = BrowserWindow.getAllWindows()[0]
+  if (win) {
+    win.show()
+    win.focus()
+  }
+})
+
+// Script to inject into webview subframes (including cross-origin iframes) so
+// that Notification clicks are routed back to Silo via postMessage → preload IPC.
+const NOTIF_CLICK_SUBFRAME_SCRIPT = `
+(() => {
+  if (window.__siloNotifWrapped) return;
+  const OrigNotif = window.Notification;
+  if (!OrigNotif) return;
+  const WrappedNotif = function(title, opts) {
+    const n = new OrigNotif(title, opts);
+    n.addEventListener('click', () => {
+      try { window.top.postMessage({ type: '__silo_notification_click' }, '*'); } catch(e) {}
+    });
+    return n;
+  };
+  WrappedNotif.requestPermission = OrigNotif.requestPermission.bind(OrigNotif);
+  Object.defineProperty(WrappedNotif, 'permission', { get: () => OrigNotif.permission });
+  WrappedNotif.prototype = OrigNotif.prototype;
+  window.Notification = WrappedNotif;
+  window.__siloNotifWrapped = true;
+})()
+`
+
 // Intercept webview context menus and new-window requests
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     // Set up permission handlers for this webview's session
     setupPermissionHandlers(contents.session)
+
+    // Inject notification-click override into child frames (cross-origin iframes
+    // like JSFiddle results) so Notification clicks can route back to Silo.
+    contents.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
+      if (isMainFrame) return
+      try {
+        const frame = webFrameMain.fromId(processId, routingId)
+        if (frame) frame.executeJavaScript(NOTIF_CLICK_SUBFRAME_SCRIPT).catch(() => {})
+      } catch {}
+    })
 
     // ── External protocol handling (mailto:, tel:, msteams://, zoommtg://, etc.) ──
     // Multiple redundant layers to catch protocol URLs and open them via the OS.
@@ -434,9 +477,35 @@ app.whenReady().then(() => {
         },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-in')
+          }
+        },
+        {
+          label: 'Zoom In (Plus)',
+          accelerator: 'CmdOrCtrl+Shift+=',
+          visible: false,
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-in')
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-out')
+          }
+        },
+        {
+          label: 'Actual Size',
+          accelerator: 'CmdOrCtrl+0',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-reset')
+          }
+        },
         { type: 'separator' },
         { role: 'togglefullscreen' }
       ]

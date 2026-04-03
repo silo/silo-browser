@@ -94,6 +94,24 @@ const api = {
   removeReloadTabListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:reload-tab')
   },
+  onZoomIn: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:zoom-in', () => callback())
+  },
+  removeZoomInListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:zoom-in')
+  },
+  onZoomOut: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:zoom-out', () => callback())
+  },
+  removeZoomOutListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:zoom-out')
+  },
+  onZoomReset: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:zoom-reset', () => callback())
+  },
+  removeZoomResetListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:zoom-reset')
+  },
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void
   ): void => {

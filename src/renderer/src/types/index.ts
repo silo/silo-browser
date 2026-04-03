@@ -15,6 +15,7 @@ export interface TabItem {
   currentTitle?: string // Runtime-only — tracks page title
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
   isMuted: boolean
+  zoomLevel: number // 0 = default (100%), persisted per-tab
 }
 
 export interface GroupItem {

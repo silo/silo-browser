@@ -14,6 +14,13 @@ const isMac = window.api.platform === 'darwin'
 const urlInput = ref('')
 const urlInputRef = ref<HTMLInputElement | null>(null)
 
+const zoomPercent = computed(() => {
+  const tab = groupsStore.activeTab
+  if (!tab) return 100
+  const level = tab.zoomLevel ?? 0
+  return Math.round(Math.pow(1.2, level) * 100)
+})
+
 const displayUrl = computed(() => {
   if (topbarStore.isChildActive) {
     const child = topbarStore.findChild(topbarStore.activeTopbarTabId!)
@@ -100,6 +107,13 @@ function goHome(): void {
     const wv = webviewRegistry.getMain(tab.id)
     if (wv) wv.loadURL(tab.url)
   }
+}
+
+function resetZoom(): void {
+  const wv = getActiveWebview()
+  if (!wv) return
+  wv.setZoomLevel(0)
+  if (groupsStore.activeTabId) groupsStore.setTabZoomLevel(groupsStore.activeTabId, 0)
 }
 
 function openExternal(): void {
@@ -206,7 +220,7 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
           <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
         </svg>
         <button
-          @click.stop="topbarStore.removeChildTab(child.id)"
+          @click.stop="uiStore.openConfirmRemoveTabDialog(child.id, true)"
           class="text-chrome-fg-muted hover:text-chrome-fg-primary shrink-0 leading-none"
           title="Close tab"
         >
@@ -217,6 +231,17 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
 
     <!-- Spacer to push URL button and external link to the right -->
     <div class="flex-1" />
+
+    <!-- Zoom indicator (shown when not at 100%) — click to reset -->
+    <button
+      v-if="zoomPercent !== 100"
+      @click="resetZoom"
+      class="app-no-drag group px-1.5 py-0.5 text-[11px] leading-none font-medium text-chrome-fg-muted bg-chrome-hover/50 border border-chrome-border rounded select-none hover:bg-chrome-hover transition-colors"
+      title="Reset zoom"
+    >
+      <span class="group-hover:hidden">{{ zoomPercent }}%</span>
+      <span class="hidden group-hover:inline">Reset</span>
+    </button>
 
     <!-- URL bar button (compact) -->
     <button

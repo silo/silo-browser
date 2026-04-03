@@ -120,7 +120,7 @@ function handleContextMenu(e: MouseEvent): void {
     { separator: true },
     {
       label: 'Delete Tab',
-      action: () => groupsStore.removeTab(props.tab.id)
+      action: () => uiStore.openConfirmRemoveTabDialog(props.tab.id)
     }
   ]
 

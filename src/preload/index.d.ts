@@ -37,6 +37,12 @@ export interface SiloApi {
   removeOpenSettingsListener: () => void
   onReloadTab: (callback: () => void) => void
   removeReloadTabListener: () => void
+  onZoomIn: (callback: () => void) => void
+  removeZoomInListener: () => void
+  onZoomOut: (callback: () => void) => void
+  removeZoomOutListener: () => void
+  onZoomReset: (callback: () => void) => void
+  removeZoomResetListener: () => void
   onPermissionRequest: (
     callback: (data: { requestId: number; permission: string; origin: string }) => void
   ) => void

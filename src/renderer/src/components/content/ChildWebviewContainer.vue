@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useGroupsStore } from '@renderer/stores/groups'
+import { useUiStore } from '@renderer/stores/ui'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import type { ChildTab } from '@renderer/types'
@@ -13,6 +14,7 @@ const props = defineProps<{
 
 const topbarStore = useTopbarTabsStore()
 const groupsStore = useGroupsStore()
+const uiStore = useUiStore()
 const { registerChild, unregisterChild } = useWebviewRegistry()
 const webviewRef = ref<Electron.WebviewTag | null>(null)
 
@@ -45,7 +47,11 @@ const handleTitleUpdated = ((e: Event) => {
 
 const handleIpcMessage = ((e: Event) => {
   const evt = e as Event & { channel: string; args: unknown[] }
-  if (evt.channel === 'silo:open-external' && evt.args?.[0]) {
+  if (evt.channel === 'notification-click') {
+    groupsStore.activateTab(props.childTab.parentTabId)
+  } else if (evt.channel === 'zoom-change') {
+    applyWebviewZoom(evt.args?.[0] as string, props.childTab.parentTabId)
+  } else if (evt.channel === 'silo:open-external' && evt.args?.[0]) {
     window.api.openExternal(evt.args[0] as string)
   }
 }) as EventListener
@@ -63,6 +69,23 @@ const handleMediaPaused = (() => {
   topbarStore.setChildAudioPlaying(props.childTab.id, false)
 }) as EventListener
 
+const handleUpdateTargetUrl = ((e: Event) => {
+  const evt = e as Event & { url: string }
+  if (evt.url) {
+    uiStore.setHoveredLinkUrl(evt.url)
+  } else {
+    uiStore.clearHoveredLinkUrl()
+  }
+}) as EventListener
+
+function applyWebviewZoom(direction: string, tabId: string): void {
+  const wv = webviewRef.value
+  if (!wv) return
+  const newLevel = wv.getZoomLevel() + (direction === 'in' ? 0.5 : -0.5)
+  wv.setZoomLevel(newLevel)
+  groupsStore.setTabZoomLevel(tabId, newLevel)
+}
+
 function setNotifEnabled(enabled: boolean): void {
   const wv = webviewRef.value
   if (!wv) return
@@ -73,8 +96,9 @@ const handleDomReady = (() => {
   const wv = webviewRef.value
   if (!wv) return
   const enabled = parentTab.value?.notificationsEnabled ?? true
-  wv.executeJavaScript(getNotificationInjectionScript(enabled)).catch(() => {})
+  wv.executeJavaScript(getNotificationInjectionScript(enabled, props.childTab.parentTabId)).catch(() => {})
   if (parentTab.value?.isMuted) wv.setAudioMuted(true)
+  wv.setZoomLevel(parentTab.value?.zoomLevel ?? 0)
 }) as EventListener
 
 watch(
@@ -107,6 +131,7 @@ onMounted(() => {
   wv.addEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.addEventListener('media-paused', handleMediaPaused)
   wv.addEventListener('dom-ready', handleDomReady)
+  wv.addEventListener('update-target-url', handleUpdateTargetUrl)
 })
 
 onUnmounted(() => {
@@ -123,6 +148,7 @@ onUnmounted(() => {
   wv.removeEventListener('media-started-playing', handleMediaStartedPlaying)
   wv.removeEventListener('media-paused', handleMediaPaused)
   wv.removeEventListener('dom-ready', handleDomReady)
+  wv.removeEventListener('update-target-url', handleUpdateTargetUrl)
 })
 </script>
 

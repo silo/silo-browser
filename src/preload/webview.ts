@@ -57,7 +57,30 @@ window.addEventListener('message', (e) => {
   if (e.data?.type === '__silo_window_open' && e.data.url) {
     ipcRenderer.send('silo:window-open', e.data.url)
   }
+  if (e.data?.type === '__silo_notification_click') {
+    const tabId = e.data.tabId || document.documentElement.dataset.siloTabId
+    if (tabId) {
+      ipcRenderer.send('silo:notification-click', tabId)
+      ipcRenderer.sendToHost('notification-click', tabId)
+    }
+  }
 })
+
+// Ctrl+scroll (and trackpad pinch) zoom — relay to parent renderer
+let _lastZoomTime = 0
+document.addEventListener(
+  'wheel',
+  (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault()
+      const now = Date.now()
+      if (now - _lastZoomTime < 100) return
+      _lastZoomTime = now
+      ipcRenderer.sendToHost('zoom-change', e.deltaY < 0 ? 'in' : 'out')
+    }
+  },
+  { passive: false }
+)
 
 // Lock focus/alert/confirm/prompt/open against reassignment by web content
 for (const name of ['focus', 'alert', 'confirm', 'prompt', 'open'] as const) {

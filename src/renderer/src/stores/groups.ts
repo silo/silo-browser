@@ -123,7 +123,8 @@ export const useGroupsStore = defineStore('groups', () => {
       notificationsEnabled: true,
       notificationCount: 0,
       sleepAfterMinutes: useUiStore().defaultSleepAfterMinutes,
-      isMuted: false
+      isMuted: false,
+      zoomLevel: 0
     }
     group.tabs.push(tab)
     debouncedSave()
@@ -257,6 +258,14 @@ export const useGroupsStore = defineStore('groups', () => {
     if (tab) tab.isAudioPlaying = playing
   }
 
+  function setTabZoomLevel(tabId: string, level: number): void {
+    const tab = findTab(tabId)
+    if (tab) {
+      tab.zoomLevel = level
+      debouncedSave()
+    }
+  }
+
   // --- Persistence ---
 
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
@@ -282,7 +291,8 @@ export const useGroupsStore = defineStore('groups', () => {
             order: t.order,
             notificationsEnabled: t.notificationsEnabled,
             isMuted: t.isMuted,
-            sleepAfterMinutes: t.sleepAfterMinutes
+            sleepAfterMinutes: t.sleepAfterMinutes,
+            zoomLevel: t.zoomLevel ?? 0
           }))
         }
       })
@@ -302,6 +312,7 @@ export const useGroupsStore = defineStore('groups', () => {
         tab.notificationsEnabled = tab.notificationsEnabled ?? true
         tab.isMuted = tab.isMuted ?? false
         tab.sleepAfterMinutes = tab.sleepAfterMinutes ?? 0
+        tab.zoomLevel = tab.zoomLevel ?? 0
         tab.lastActiveAt = Date.now()
       }
     }
@@ -374,6 +385,7 @@ export const useGroupsStore = defineStore('groups', () => {
     setTabCurrentTitle,
     incrementNotification,
     setTabAudioPlaying,
+    setTabZoomLevel,
     loadFromDisk
   }
 })

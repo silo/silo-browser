@@ -59,16 +59,28 @@ export const useUiStore = defineStore('ui', () => {
     editTabTargetId.value = null
   }
 
+  // --- Link hover status bar ---
+  const hoveredLinkUrl = ref<string | null>(null)
+  function setHoveredLinkUrl(url: string): void {
+    hoveredLinkUrl.value = url
+  }
+  function clearHoveredLinkUrl(): void {
+    hoveredLinkUrl.value = null
+  }
+
   // --- Confirm remove tab dialog ---
   const confirmRemoveTabDialogOpen = ref(false)
   const confirmRemoveTabTargetId = ref<string | null>(null)
-  function openConfirmRemoveTabDialog(tabId: string): void {
+  const confirmRemoveTabIsChild = ref(false)
+  function openConfirmRemoveTabDialog(tabId: string, isChild = false): void {
     confirmRemoveTabTargetId.value = tabId
+    confirmRemoveTabIsChild.value = isChild
     confirmRemoveTabDialogOpen.value = true
   }
   function closeConfirmRemoveTabDialog(): void {
     confirmRemoveTabDialogOpen.value = false
     confirmRemoveTabTargetId.value = null
+    confirmRemoveTabIsChild.value = false
   }
 
   // --- Context menu ---
@@ -332,8 +344,12 @@ export const useUiStore = defineStore('ui', () => {
     editGroupTargetId,
     editTabDialogOpen,
     editTabTargetId,
+    hoveredLinkUrl,
+    setHoveredLinkUrl,
+    clearHoveredLinkUrl,
     confirmRemoveTabDialogOpen,
     confirmRemoveTabTargetId,
+    confirmRemoveTabIsChild,
     openConfirmRemoveTabDialog,
     closeConfirmRemoveTabDialog,
     contextMenuVisible,

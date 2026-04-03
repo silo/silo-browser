@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
+import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
 
 const groupsStore = useGroupsStore()
+const topbarStore = useTopbarTabsStore()
 const uiStore = useUiStore()
 
 const tab = computed(() => {
   if (!uiStore.confirmRemoveTabTargetId) return null
+  if (uiStore.confirmRemoveTabIsChild) {
+    const child = topbarStore.childTabs.find((c) => c.id === uiStore.confirmRemoveTabTargetId)
+    if (child) return { name: child.currentTitle || child.url }
+  }
   return groupsStore.allTabsFlat.find((t) => t.id === uiStore.confirmRemoveTabTargetId) ?? null
 })
 
 function confirm(): void {
   if (uiStore.confirmRemoveTabTargetId) {
-    groupsStore.removeTab(uiStore.confirmRemoveTabTargetId)
+    if (uiStore.confirmRemoveTabIsChild) {
+      topbarStore.removeChildTab(uiStore.confirmRemoveTabTargetId)
+    } else {
+      groupsStore.removeTab(uiStore.confirmRemoveTabTargetId)
+    }
   }
   uiStore.closeConfirmRemoveTabDialog()
 }
@@ -56,8 +66,7 @@ function close(): void {
         <div class="px-6 py-5">
           <p class="text-sm text-fg-secondary">
             Are you sure you want to remove
-            <span class="font-semibold text-fg-primary">{{ tab?.name ?? 'this tab' }}</span>
-            from the sidebar?
+            <span class="font-semibold text-fg-primary">{{ tab?.name ?? 'this tab' }}</span>?
           </p>
         </div>
 
