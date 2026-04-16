@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
@@ -28,6 +28,12 @@ function confirm(): void {
   uiStore.closeConfirmRemoveTabDialog()
 }
 
+const dialogRef = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  nextTick(() => dialogRef.value?.focus())
+})
+
 function close(): void {
   uiStore.closeConfirmRemoveTabDialog()
 }
@@ -36,8 +42,11 @@ function close(): void {
 <template>
   <Teleport to="body">
     <div
+      ref="dialogRef"
       class="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
       @click.self="close"
+      @keydown.enter="confirm"
+      tabindex="-1"
     >
       <div
         class="bg-surface-raised rounded-lg shadow-xl border border-border-default w-[400px] flex flex-col"

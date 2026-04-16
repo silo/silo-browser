@@ -88,6 +88,11 @@ onMounted(async () => {
     wv?.reload()
   })
 
+  // Find shortcut
+  window.api.onFind(() => {
+    uiStore.openFindBar()
+  })
+
   // Zoom shortcuts
   window.api.onZoomIn(() => applyZoom(0.5))
   window.api.onZoomOut(() => applyZoom(-0.5))
@@ -108,6 +113,7 @@ onUnmounted(() => {
   window.api.removeZoomOutListener()
   window.api.removeZoomResetListener()
   window.api.removePermissionRequestListener()
+  window.api.removeFindListener()
 })
 
 function applyZoom(delta: number, reset = false): void {
@@ -120,7 +126,11 @@ function applyZoom(delta: number, reset = false): void {
 
 function handleCloseTab(): void {
   if (topbarStore.isChildActive) {
-    uiStore.openConfirmRemoveTabDialog(topbarStore.activeTopbarTabId!, true)
+    if (uiStore.confirmCloseChildTabs) {
+      uiStore.openConfirmRemoveTabDialog(topbarStore.activeTopbarTabId!, true)
+    } else {
+      topbarStore.removeChildTab(topbarStore.activeTopbarTabId!)
+    }
   } else if (groupsStore.activeTabId) {
     uiStore.openConfirmRemoveTabDialog(groupsStore.activeTabId)
   }
@@ -160,6 +170,13 @@ function handleKeydown(e: KeyboardEvent): void {
     e.preventDefault()
     const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
     wv?.reload()
+    return
+  }
+
+  // Ctrl/Cmd+F — find in page
+  if (mod && e.key === 'f') {
+    e.preventDefault()
+    uiStore.openFindBar()
     return
   }
 
@@ -208,6 +225,7 @@ function handleKeydown(e: KeyboardEvent): void {
     if (uiStore.editTabDialogOpen) { uiStore.closeEditTabDialog(); return }
     if (uiStore.confirmRemoveTabDialogOpen) { uiStore.closeConfirmRemoveTabDialog(); return }
     if (uiStore.updateDialogOpen) { uiStore.closeUpdateDialog(); return }
+    if (uiStore.findBarOpen) { uiStore.closeFindBar(); return }
     if (uiStore.urlBarOpen) { uiStore.closeUrlBar(); return }
     if (uiStore.settingsPageOpen) { uiStore.closeSettingsPage(); return }
   }

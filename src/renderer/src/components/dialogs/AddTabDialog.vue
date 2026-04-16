@@ -56,6 +56,7 @@ function close(): void {
       v-if="uiStore.addTabDialogOpen"
       class="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
       @click.self="close"
+      @keydown.enter="submit"
     >
       <div class="bg-surface-raised rounded-lg p-6 w-96 shadow-xl border border-border-default">
         <h2 class="text-lg font-semibold text-fg-primary mb-4">Add Tab</h2>
@@ -66,7 +67,7 @@ function close(): void {
           type="text"
           placeholder="e.g. mail.google.com"
           class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-4"
-          @keydown.enter="submit"
+          @keydown.enter.stop="submit"
           autofocus
         />
 
@@ -76,7 +77,7 @@ function close(): void {
           type="text"
           placeholder="Auto-detected from URL"
           class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-6"
-          @keydown.enter="submit"
+          @keydown.enter.stop="submit"
           @input="onNameInput"
         />
 

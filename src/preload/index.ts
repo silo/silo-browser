@@ -22,6 +22,8 @@ const api = {
     ipcRenderer.invoke('store:save-child-tabs', childTabs, activeChildTabId),
   saveDefaultSleepAfterMinutes: (value: number): Promise<void> =>
     ipcRenderer.invoke('store:save-default-sleep-after-minutes', value),
+  saveConfirmCloseChildTabs: (value: boolean): Promise<void> =>
+    ipcRenderer.invoke('store:save-confirm-close-child-tabs', value),
   clearGroupSession: (groupId: string): Promise<void> =>
     ipcRenderer.invoke('store:clear-group-session', groupId),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
@@ -93,6 +95,12 @@ const api = {
   },
   removeReloadTabListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:reload-tab')
+  },
+  onFind: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:find', () => callback())
+  },
+  removeFindListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:find')
   },
   onZoomIn: (callback: () => void): void => {
     ipcRenderer.on('shortcut:zoom-in', () => callback())

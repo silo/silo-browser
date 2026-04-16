@@ -150,6 +150,16 @@ function handleDragLeave(e: DragEvent): void {
     }
   }
 }
+
+function handleMouseEnter(e: MouseEvent): void {
+  if (uiStore.sidebarExpanded) return
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  uiStore.showSidebarTooltip(props.group.name, rect.right + 8, rect.top + rect.height / 2)
+}
+
+function handleMouseLeave(): void {
+  uiStore.hideSidebarTooltip()
+}
 </script>
 
 <template>
@@ -178,6 +188,8 @@ function handleDragLeave(e: DragEvent): void {
       ]"
       @click="groupsStore.toggleGroupCollapse(group.id)"
       @contextmenu="handleContextMenu"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
       draggable="true"
       @dragstart="handleGroupDragStart"
       @dragover.stop="handleHeaderDragOver"

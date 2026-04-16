@@ -26,29 +26,29 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "electron-updater": "^6.3.9",
+    "electron-updater": "^6.8.3",
     "pinia": "^3.0.4"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@tailwindcss/vite": "^4.1.18",
-    "@types/node": "^22.19.1",
-    "@vitejs/plugin-vue": "^6.0.2",
-    "electron": "^39.2.6",
-    "electron-builder": "^26.0.12",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/node": "^22.19.17",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "electron": "^39.8.8",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-vue": "^10.6.2",
-    "prettier": "^3.7.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.8.0",
+    "prettier": "^3.8.3",
     "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6",
-    "vue": "^3.5.25",
-    "vue-eslint-parser": "^10.2.0",
-    "vue-tsc": "^3.1.6"
+    "vite": "^7.3.2",
+    "vue": "^3.5.32",
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

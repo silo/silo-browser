@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useUiStore } from '@renderer/stores/ui'
 import TheNavigationBar from './TheNavigationBar.vue'
 import PermissionBanner from './PermissionBanner.vue'
+import FindBar from './FindBar.vue'
 import WebviewContainer from './WebviewContainer.vue'
 import ChildWebviewContainer from './ChildWebviewContainer.vue'
 import EmptyState from './EmptyState.vue'
@@ -10,12 +12,14 @@ import LinkStatusBar from './LinkStatusBar.vue'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
+const uiStore = useUiStore()
 </script>
 
 <template>
   <div class="flex-1 flex flex-col min-w-0">
     <TheNavigationBar />
     <PermissionBanner />
+    <FindBar v-if="uiStore.findBarOpen" />
     <main class="flex-1 relative bg-surface-chrome">
       <EmptyState v-if="!groupsStore.activeTab" />
       <WebviewContainer

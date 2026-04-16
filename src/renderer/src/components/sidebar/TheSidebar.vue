@@ -3,6 +3,7 @@ import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import SidebarGroup from './SidebarGroup.vue'
 import AddGroupButton from './AddGroupButton.vue'
+import SidebarTooltip from './SidebarTooltip.vue'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
@@ -19,7 +20,7 @@ const isMac = window.api.platform === 'darwin'
     <!-- macOS traffic light spacer -->
     <div v-if="isMac" class="h-10 shrink-0" style="-webkit-app-region: drag" />
 
-    <div class="flex-1 overflow-y-auto overflow-x-hidden py-2 border-r border-chrome-border">
+    <div class="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden py-2 border-r border-chrome-border">
       <TransitionGroup tag="div" name="group-list">
         <SidebarGroup
           v-for="group in groupsStore.sortedGroups"
@@ -94,4 +95,5 @@ const isMac = window.api.platform === 'darwin'
       </div>
     </div>
   </aside>
+  <SidebarTooltip />
 </template>

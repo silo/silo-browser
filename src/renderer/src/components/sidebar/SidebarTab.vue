@@ -179,6 +179,18 @@ function handleDragLeave(e: DragEvent): void {
     }
   }
 }
+
+function handleMouseEnter(e: MouseEvent): void {
+  if (uiStore.sidebarExpanded) return
+  const group = groupsStore.groups.find((g) => g.id === props.tab.groupId)
+  const label = group ? `${group.name} - ${props.tab.name}` : props.tab.name
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  uiStore.showSidebarTooltip(label, rect.right + 8, rect.top + rect.height / 2)
+}
+
+function handleMouseLeave(): void {
+  uiStore.hideSidebarTooltip()
+}
 </script>
 
 <template>
@@ -199,7 +211,9 @@ function handleDragLeave(e: DragEvent): void {
       ]"
       @click="activate"
       @contextmenu="handleContextMenu"
-      :title="tab.name"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
+      :title="uiStore.sidebarExpanded ? tab.name : undefined"
       draggable="true"
       @dragstart="handleDragStart"
       @dragover="handleDragOver"

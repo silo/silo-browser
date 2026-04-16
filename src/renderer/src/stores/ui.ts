@@ -95,9 +95,25 @@ export const useUiStore = defineStore('ui', () => {
     contextMenuItems.value = []
   }
 
+  // --- Sidebar tooltip ---
+  const sidebarTooltipText = ref('')
+  const sidebarTooltipX = ref(0)
+  const sidebarTooltipY = ref(0)
+  const sidebarTooltipVisible = ref(false)
+  function showSidebarTooltip(text: string, x: number, y: number): void {
+    sidebarTooltipText.value = text
+    sidebarTooltipX.value = x
+    sidebarTooltipY.value = y
+    sidebarTooltipVisible.value = true
+  }
+  function hideSidebarTooltip(): void {
+    sidebarTooltipVisible.value = false
+  }
+
   // --- App settings ---
   const openLinksInNewTab = ref(true)
   const defaultSleepAfterMinutes = ref(0)
+  const confirmCloseChildTabs = ref(false)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -107,6 +123,11 @@ export const useUiStore = defineStore('ui', () => {
   function setDefaultSleepAfterMinutes(value: number): void {
     defaultSleepAfterMinutes.value = value
     window.api.saveDefaultSleepAfterMinutes(value)
+  }
+
+  function setConfirmCloseChildTabs(value: boolean): void {
+    confirmCloseChildTabs.value = value
+    window.api.saveConfirmCloseChildTabs(value)
   }
 
   // --- Theme ---
@@ -282,6 +303,15 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
+  // --- Find bar ---
+  const findBarOpen = ref(false)
+  function openFindBar(): void {
+    findBarOpen.value = true
+  }
+  function closeFindBar(): void {
+    findBarOpen.value = false
+  }
+
   // --- URL bar modal ---
   const urlBarOpen = ref(false)
   function openUrlBar(): void {
@@ -329,6 +359,7 @@ export const useUiStore = defineStore('ui', () => {
     sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
     defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
+    confirmCloseChildTabs.value = (state.confirmCloseChildTabs as boolean | undefined) ?? false
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
@@ -367,13 +398,24 @@ export const useUiStore = defineStore('ui', () => {
     closeEditTabDialog,
     showContextMenu,
     hideContextMenu,
+    sidebarTooltipText,
+    sidebarTooltipX,
+    sidebarTooltipY,
+    sidebarTooltipVisible,
+    showSidebarTooltip,
+    hideSidebarTooltip,
     openLinksInNewTab,
     setOpenLinksInNewTab,
     defaultSleepAfterMinutes,
     setDefaultSleepAfterMinutes,
+    confirmCloseChildTabs,
+    setConfirmCloseChildTabs,
     permissionRequest,
     showPermissionRequest,
     respondToPermission,
+    findBarOpen,
+    openFindBar,
+    closeFindBar,
     urlBarOpen,
     openUrlBar,
     closeUrlBar,

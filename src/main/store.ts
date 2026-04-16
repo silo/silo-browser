@@ -15,6 +15,7 @@ export interface PersistedState {
   surfaceColor: string
   grantedPermissions: string[] // "origin::permission" entries
   defaultSleepAfterMinutes: number
+  confirmCloseChildTabs: boolean
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
@@ -32,7 +33,8 @@ const defaultState: PersistedState = {
   accentColor: 'gray',
   surfaceColor: 'charcoal',
   grantedPermissions: [],
-  defaultSleepAfterMinutes: 0
+  defaultSleepAfterMinutes: 0,
+  confirmCloseChildTabs: false
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -75,7 +77,9 @@ export function loadState(): PersistedState {
         ? parsed.grantedPermissions.filter((p: unknown) => typeof p === 'string')
         : [],
       defaultSleepAfterMinutes:
-        typeof parsed.defaultSleepAfterMinutes === 'number' ? parsed.defaultSleepAfterMinutes : 0
+        typeof parsed.defaultSleepAfterMinutes === 'number' ? parsed.defaultSleepAfterMinutes : 0,
+      confirmCloseChildTabs:
+        typeof parsed.confirmCloseChildTabs === 'boolean' ? parsed.confirmCloseChildTabs : false
     }
     cachedState = { ...state }
     return state

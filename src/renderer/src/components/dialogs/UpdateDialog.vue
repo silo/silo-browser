@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useUiStore } from '@renderer/stores/ui'
 
 const uiStore = useUiStore()
@@ -15,6 +15,12 @@ function downloadFromGitHub(): void {
   close()
 }
 
+const dialogRef = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  nextTick(() => dialogRef.value?.focus())
+})
+
 function close(): void {
   uiStore.closeUpdateDialog()
 }
@@ -24,8 +30,11 @@ function close(): void {
   <Teleport to="body">
     <div
       v-if="uiStore.updateDialogOpen"
+      ref="dialogRef"
       class="fixed inset-0 z-50 flex items-center justify-center bg-overlay"
       @click.self="close"
+      @keydown.enter="isFallback ? downloadFromGitHub() : restartNow()"
+      tabindex="-1"
     >
       <div
         class="bg-surface-raised rounded-lg shadow-xl border border-border-default w-[400px] flex flex-col"

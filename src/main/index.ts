@@ -348,15 +348,15 @@ app.on('web-contents-created', (_event, contents) => {
         menu.append(
           new MenuItem({
             label: 'Back',
-            enabled: contents.canGoBack(),
-            click: () => contents.goBack()
+            enabled: contents.navigationHistory.canGoBack(),
+            click: () => contents.navigationHistory.goBack()
           })
         )
         menu.append(
           new MenuItem({
             label: 'Forward',
-            enabled: contents.canGoForward(),
-            click: () => contents.goForward()
+            enabled: contents.navigationHistory.canGoForward(),
+            click: () => contents.navigationHistory.goForward()
           })
         )
         menu.append(
@@ -380,7 +380,7 @@ app.whenReady().then(() => {
 
   app.setAboutPanelOptions({
     applicationName: 'Silo Browser',
-    copyright: 'Copyright \u00A9 2025 silo.dev',
+    copyright: `Copyright \u00A9 ${new Date().getFullYear()} silo.dev`,
     website: 'https://silo.dev'
   })
 
@@ -455,7 +455,15 @@ app.whenReady().then(() => {
         },
         { role: 'delete' },
         { type: 'separator' },
-        { role: 'selectAll' }
+        { role: 'selectAll' },
+        { type: 'separator' },
+        {
+          label: 'Find',
+          accelerator: 'CmdOrCtrl+F',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:find')
+          }
+        }
       ]
     },
     {

@@ -58,6 +58,10 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle('store:save-confirm-close-child-tabs', async (_event, value: boolean) => {
+    await saveState({ confirmCloseChildTabs: value })
+  })
+
   ipcMain.handle('store:clear-group-session', async (_event, groupId: string) => {
     const partition = `persist:silo-group-${groupId}`
     const ses = session.fromPartition(partition)

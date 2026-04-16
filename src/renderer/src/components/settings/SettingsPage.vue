@@ -70,9 +70,13 @@ const shortcuts: { keys: string; description: string }[] = [
   { keys: `${mod}+N`, description: 'New group' },
   { keys: `${mod}+W`, description: 'Close active child tab' },
   { keys: `${mod}+R`, description: 'Reload active tab' },
+  { keys: `${mod}+F`, description: 'Find in page' },
   { keys: `${mod}+L`, description: 'Focus URL bar' },
   { keys: `${mod}+,`, description: 'Toggle settings' },
   { keys: `${mod}+[ / ]`, description: 'Toggle sidebar' },
+  { keys: `${mod}+=`, description: 'Zoom in' },
+  { keys: `${mod}+-`, description: 'Zoom out' },
+  { keys: `${mod}+0`, description: 'Reset zoom' },
   { keys: `${mod}+1-9`, description: 'Switch to Nth tab' },
   { keys: 'Esc', description: 'Close dialogs / settings' }
 ]
@@ -259,6 +263,23 @@ function onCustomSurfaceColor(event: Event): void {
                 <option :value="120">2 hours</option>
                 <option :value="240">4 hours</option>
               </select>
+            </label>
+
+            <label
+              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded cursor-pointer hover:border-accent transition-colors"
+            >
+              <div>
+                <span class="text-sm text-chrome-fg-secondary">Confirm before closing child tabs</span>
+                <p class="text-xs text-chrome-fg-faint mt-0.5">
+                  Show a confirmation dialog when closing topbar tabs
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                :checked="uiStore.confirmCloseChildTabs"
+                @change="uiStore.setConfirmCloseChildTabs(($event.target as HTMLInputElement).checked)"
+                class="w-4 h-4 cursor-pointer"
+              />
             </label>
           </div>
         </div>
