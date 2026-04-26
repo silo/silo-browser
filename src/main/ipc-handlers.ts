@@ -62,6 +62,10 @@ export function registerIpcHandlers(): void {
     await saveState({ confirmCloseChildTabs: value })
   })
 
+  ipcMain.handle('store:save-default-user-agent', async (_event, value: string) => {
+    await saveState({ defaultUserAgent: value })
+  })
+
   ipcMain.handle('store:clear-group-session', async (_event, groupId: string) => {
     const partition = `persist:silo-group-${groupId}`
     const ses = session.fromPartition(partition)

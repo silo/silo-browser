@@ -15,6 +15,7 @@ export interface SiloApi {
   saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null) => Promise<void>
   saveDefaultSleepAfterMinutes: (value: number) => Promise<void>
   saveConfirmCloseChildTabs: (value: boolean) => Promise<void>
+  saveDefaultUserAgent: (value: string) => Promise<void>
   clearGroupSession: (groupId: string) => Promise<void>
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>

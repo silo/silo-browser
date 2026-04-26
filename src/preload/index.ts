@@ -24,6 +24,8 @@ const api = {
     ipcRenderer.invoke('store:save-default-sleep-after-minutes', value),
   saveConfirmCloseChildTabs: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('store:save-confirm-close-child-tabs', value),
+  saveDefaultUserAgent: (value: string): Promise<void> =>
+    ipcRenderer.invoke('store:save-default-user-agent', value),
   clearGroupSession: (groupId: string): Promise<void> =>
     ipcRenderer.invoke('store:clear-group-session', groupId),
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),

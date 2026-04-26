@@ -100,7 +100,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function updateGroup(
     groupId: string,
-    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji'>>
+    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji' | 'userAgent'>>
   ): void {
     const group = findGroup(groupId)
     if (group) {
@@ -150,7 +150,7 @@ export const useGroupsStore = defineStore('groups', () => {
   function updateTab(
     tabId: string,
     updates: Partial<
-      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted' | 'sleepAfterMinutes'>
+      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted' | 'sleepAfterMinutes' | 'userAgent'>
     >
   ): void {
     const tab = findTab(tabId)
@@ -279,6 +279,8 @@ export const useGroupsStore = defineStore('groups', () => {
           id: rawGroup.id,
           name: rawGroup.name,
           color: rawGroup.color,
+          iconEmoji: rawGroup.iconEmoji,
+          userAgent: rawGroup.userAgent,
           order: rawGroup.order,
           isCollapsed: rawGroup.isCollapsed,
           tabs: rawGroup.tabs.map((t) => ({
@@ -292,7 +294,8 @@ export const useGroupsStore = defineStore('groups', () => {
             notificationsEnabled: t.notificationsEnabled,
             isMuted: t.isMuted,
             sleepAfterMinutes: t.sleepAfterMinutes,
-            zoomLevel: t.zoomLevel ?? 0
+            zoomLevel: t.zoomLevel ?? 0,
+            userAgent: t.userAgent
           }))
         }
       })

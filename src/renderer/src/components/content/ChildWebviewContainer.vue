@@ -23,6 +23,11 @@ const parentTab = computed(() => groupsStore.findTab(props.childTab.parentTabId)
 const partition = computed(() => `persist:silo-group-${props.childTab.groupId}`)
 const webviewPreload = window.api.webviewPreloadPath
 
+const effectiveUserAgent = computed(() => {
+  const group = groupsStore.findGroup(props.childTab.groupId)
+  return group?.userAgent || uiStore.defaultUserAgent || undefined
+})
+
 const handleFaviconUpdated = ((e: Event) => {
   const evt = e as Event & { favicons: string[] }
   if (evt.favicons?.length > 0) {
@@ -99,6 +104,7 @@ const handleDomReady = (() => {
   wv.executeJavaScript(getNotificationInjectionScript(enabled, props.childTab.parentTabId)).catch(() => {})
   if (parentTab.value?.isMuted) wv.setAudioMuted(true)
   wv.setZoomLevel(parentTab.value?.zoomLevel ?? 0)
+  if (effectiveUserAgent.value) wv.setUserAgent(effectiveUserAgent.value)
 }) as EventListener
 
 watch(
@@ -115,6 +121,16 @@ watch(
     if (wv) wv.setAudioMuted(muted ?? false)
   }
 )
+
+watch(effectiveUserAgent, (ua) => {
+  const wv = webviewRef.value
+  if (!wv) return
+  try {
+    wv.setUserAgent(ua ?? '')
+  } catch {
+    // ignore — dom-ready will reapply on next load
+  }
+})
 
 onMounted(() => {
   const wv = webviewRef.value
@@ -162,6 +178,7 @@ onUnmounted(() => {
       :partition="partition"
       :preload="webviewPreload"
       :data-child-tab-id="childTab.id"
+      :useragent="effectiveUserAgent"
       class="w-full h-full"
       allowpopups
       webpreferences="backgroundThrottling=no"

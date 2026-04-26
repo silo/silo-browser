@@ -114,6 +114,7 @@ export const useUiStore = defineStore('ui', () => {
   const openLinksInNewTab = ref(true)
   const defaultSleepAfterMinutes = ref(0)
   const confirmCloseChildTabs = ref(false)
+  const defaultUserAgent = ref('')
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -128,6 +129,11 @@ export const useUiStore = defineStore('ui', () => {
   function setConfirmCloseChildTabs(value: boolean): void {
     confirmCloseChildTabs.value = value
     window.api.saveConfirmCloseChildTabs(value)
+  }
+
+  function setDefaultUserAgent(value: string): void {
+    defaultUserAgent.value = value
+    window.api.saveDefaultUserAgent(value)
   }
 
   // --- Theme ---
@@ -360,6 +366,7 @@ export const useUiStore = defineStore('ui', () => {
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
     defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
     confirmCloseChildTabs.value = (state.confirmCloseChildTabs as boolean | undefined) ?? false
+    defaultUserAgent.value = (state.defaultUserAgent as string | undefined) ?? ''
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
@@ -410,6 +417,8 @@ export const useUiStore = defineStore('ui', () => {
     setDefaultSleepAfterMinutes,
     confirmCloseChildTabs,
     setConfirmCloseChildTabs,
+    defaultUserAgent,
+    setDefaultUserAgent,
     permissionRequest,
     showPermissionRequest,
     respondToPermission,

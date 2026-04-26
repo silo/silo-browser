@@ -19,6 +19,11 @@ const webviewRef = ref<Electron.WebviewTag | null>(null)
 const partition = computed(() => `persist:silo-group-${props.tab.groupId}`)
 const webviewPreload = window.api.webviewPreloadPath
 
+const effectiveUserAgent = computed(() => {
+  const group = groupsStore.findGroup(props.tab.groupId)
+  return props.tab.userAgent || group?.userAgent || uiStore.defaultUserAgent || undefined
+})
+
 const handleFaviconUpdated = ((e: Event) => {
   const evt = e as Event & { favicons: string[] }
   if (evt.favicons?.length > 0) {
@@ -100,6 +105,7 @@ const handleDomReady = (() => {
   wv.executeJavaScript(getNotificationInjectionScript(enabled, props.tab.id)).catch(() => {})
   if (props.tab.isMuted) wv.setAudioMuted(true)
   wv.setZoomLevel(props.tab.zoomLevel ?? 0)
+  if (effectiveUserAgent.value) wv.setUserAgent(effectiveUserAgent.value)
 }) as EventListener
 
 watch(
@@ -116,6 +122,16 @@ watch(
     if (wv) wv.setAudioMuted(muted)
   }
 )
+
+watch(effectiveUserAgent, (ua) => {
+  const wv = webviewRef.value
+  if (!wv) return
+  try {
+    wv.setUserAgent(ua ?? '')
+  } catch {
+    // setUserAgent throws if webContents is not yet attached — ignore, dom-ready will catch it
+  }
+})
 
 onMounted(() => {
   const wv = webviewRef.value
@@ -163,6 +179,7 @@ onUnmounted(() => {
       :partition="partition"
       :preload="webviewPreload"
       :data-tab-id="tab.id"
+      :useragent="effectiveUserAgent"
       class="w-full h-full"
       allowpopups
       webpreferences="backgroundThrottling=no"

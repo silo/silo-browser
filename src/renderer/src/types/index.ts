@@ -16,6 +16,7 @@ export interface TabItem {
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
   isMuted: boolean
   zoomLevel: number // 0 = default (100%), persisted per-tab
+  userAgent?: string
 }
 
 export interface GroupItem {
@@ -26,6 +27,7 @@ export interface GroupItem {
   order: number
   isCollapsed: boolean
   tabs: TabItem[]
+  userAgent?: string
 }
 
 export interface ChildTab {

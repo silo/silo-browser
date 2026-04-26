@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
@@ -11,6 +12,7 @@ const url = ref('')
 const iconEmoji = ref('')
 const notificationsEnabled = ref(true)
 const sleepAfterMinutes = ref(0)
+const userAgent = ref('')
 
 watch(
   () => uiStore.editTabTargetId,
@@ -23,6 +25,7 @@ watch(
       iconEmoji.value = tab.iconEmoji ?? ''
       notificationsEnabled.value = tab.notificationsEnabled
       sleepAfterMinutes.value = tab.sleepAfterMinutes ?? 0
+      userAgent.value = tab.userAgent ?? ''
     }
   },
   { immediate: true }
@@ -43,7 +46,8 @@ function submit(): void {
     url: finalUrl,
     iconEmoji: iconEmoji.value.trim() || undefined,
     notificationsEnabled: notificationsEnabled.value,
-    sleepAfterMinutes: sleepAfterMinutes.value
+    sleepAfterMinutes: sleepAfterMinutes.value,
+    userAgent: userAgent.value.trim() || undefined
   })
   close()
 }
@@ -102,7 +106,7 @@ function close(): void {
         <label class="block text-sm text-fg-muted mb-1">Auto-sleep</label>
         <select
           v-model.number="sleepAfterMinutes"
-          class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-6"
+          class="w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft mb-4"
         >
           <option :value="0">Never</option>
           <option :value="30">After 30 minutes</option>
@@ -110,6 +114,9 @@ function close(): void {
           <option :value="120">After 2 hours</option>
           <option :value="240">After 4 hours</option>
         </select>
+
+        <label class="block text-sm text-fg-muted mb-1">User Agent</label>
+        <UserAgentSelector v-model="userAgent" class="mb-6" />
 
         <div class="flex justify-end gap-2">
           <button

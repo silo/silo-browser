@@ -4,6 +4,7 @@ import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import type { AccentColor, SurfaceColor } from '@renderer/types'
+import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
@@ -281,6 +282,25 @@ function onCustomSurfaceColor(event: Event): void {
                 class="w-4 h-4 cursor-pointer"
               />
             </label>
+
+            <div
+              class="flex flex-col gap-2 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-accent transition-colors"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span class="text-sm text-chrome-fg-secondary">Default user agent</span>
+                  <p class="text-xs text-chrome-fg-faint mt-0.5">
+                    Used by all groups unless overridden. Takes effect on next reload.
+                  </p>
+                </div>
+                <UserAgentSelector
+                  :model-value="uiStore.defaultUserAgent"
+                  @update:model-value="uiStore.setDefaultUserAgent"
+                  variant="chrome"
+                  default-label="Default (auto)"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
