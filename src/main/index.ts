@@ -122,6 +122,14 @@ function setupPermissionHandlers(ses: Electron.Session): void {
   if (handledSessions.has(ses)) return
   handledSessions.add(ses)
 
+  // Strip Electron/app identifiers from this session's user agent so sites
+  // (especially Google sign-in) see a standard Chrome UA.
+  ses.setUserAgent(
+    ses.getUserAgent()
+      .replace(/\s+Electron\/\S+/, '')
+      .replace(/\s+silo-browser\/\S+/i, '')
+  )
+
   ses.setPermissionRequestHandler((webContents, permission, callback) => {
     if (autoGrantPermissions.has(permission)) {
       callback(true)
@@ -282,6 +290,10 @@ app.on('web-contents-created', (_event, contents) => {
       if (isExternalProtocol(url)) {
         openExternalDedup(url)
         return { action: 'deny' }
+      }
+      // Allow Google OAuth popups so sign-in works inside webviews
+      if (url.includes('accounts.google.com')) {
+        return { action: 'allow' }
       }
       const state = getCachedState()
       if (state.openLinksInNewTab) {

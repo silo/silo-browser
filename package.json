@@ -33,22 +33,22 @@
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^22.19.17",
     "@vitejs/plugin-vue": "^6.0.6",
-    "electron": "^39.8.8",
+    "electron": "^39.8.9",
     "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.4",
-    "eslint-plugin-vue": "^10.8.0",
+    "eslint-plugin-vue": "^10.9.0",
     "prettier": "^3.8.3",
     "sharp": "^0.34.5",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3",
     "vite": "^7.3.2",
-    "vue": "^3.5.32",
+    "vue": "^3.5.33",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.2.6"
+    "vue-tsc": "^3.2.7"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
