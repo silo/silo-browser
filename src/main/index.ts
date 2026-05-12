@@ -15,6 +15,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { initAutoUpdater } from './updater'
 import { getCachedState, loadState, saveState } from './store'
+import { extensions } from './extensions'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
@@ -36,13 +37,20 @@ function createWindow(): BrowserWindow {
     ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 12, y: 12 } } : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,
       webviewTag: true,
       contextIsolation: true,
       nodeIntegration: false
     }
   })
+
+  // electron-chrome-extensions creates one binding per group session, and each
+  // binding's WindowsAPI registers focus/closed/resized listeners on the main
+  // window. With 10+ groups we cross Node's default cap and get
+  // MaxListenersExceededWarning spam. Raise the ceiling — these listeners are
+  // legitimate, not a leak.
+  mainWindow.setMaxListeners(100)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -265,6 +273,23 @@ app.on('web-contents-created', (_event, contents) => {
     // Set up permission handlers for this webview's session
     setupPermissionHandlers(contents.session)
 
+    // Initialize Chrome extensions for this group session and register the tab.
+    extensions.initSession(contents.session).catch((err) =>
+      console.error('Failed to init extensions for session:', err)
+    )
+    contents.once('did-finish-load', () => extensions.trackTab(contents))
+
+    // Surface renderer crashes so we don't end up with dead WebContents in
+    // extension tracking. Heavy extension content scripts (Sider's streaming
+    // chat, etc.) can OOM the renderer; without this the dead webContents
+    // stays in the extension library's tab map and any subsequent access
+    // takes the main process down.
+    contents.on('render-process-gone', (_e, details) => {
+      console.error(
+        `[silo] webview renderer gone: reason=${details.reason} exitCode=${details.exitCode} url=${contents.getURL()}`
+      )
+    })
+
     // Inject notification-click override into child frames (cross-origin iframes
     // like JSFiddle results) so Notification clicks can route back to Silo.
     contents.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
@@ -377,6 +402,19 @@ app.on('web-contents-created', (_event, contents) => {
             click: () => contents.reload()
           })
         )
+      }
+
+      // Append extension-contributed items (e.g. Bitwarden's "Autofill",
+      // "Copy username", "Generate password"). They go at the bottom so Silo's
+      // own actions stay prominent.
+      const extensionItems = extensions.getContextMenuItems(contents, params)
+      if (extensionItems.length > 0) {
+        if (menu.items.length > 0 && menu.items[menu.items.length - 1].type !== 'separator') {
+          menu.append(new MenuItem({ type: 'separator' }))
+        }
+        for (const item of extensionItems) {
+          menu.append(item)
+        }
       }
 
       const win = BrowserWindow.getFocusedWindow()
@@ -564,7 +602,27 @@ app.whenReady().then(() => {
   nativeTheme.themeSource = initialState.themeMode as 'dark' | 'light' | 'system'
   registerIpcHandlers()
   const mainWindow = createWindow()
+  extensions.setMainWindowResolver(() => (mainWindow.isDestroyed() ? null : mainWindow))
+  extensions.ensureMainSessionInitialised()
   setTimeout(() => initAutoUpdater(mainWindow), 3000)
+
+  // Surface any child-process death (renderer, GPU, utility, plugin). If the
+  // app eventually crashes hard, the line printed here from the *first* child
+  // to die usually points at the real cause.
+  app.on('child-process-gone', (_event, details) => {
+    console.error(
+      `[silo] child-process-gone: type=${details.type} reason=${details.reason} exitCode=${details.exitCode} name=${details.name ?? ''}`
+    )
+  })
+
+  // Catch unhandled rejections in the main process — without this they're
+  // silently swallowed by Node's default handler and we lose the stack.
+  process.on('unhandledRejection', (reason) => {
+    console.error('[silo] unhandled rejection:', reason)
+  })
+  process.on('uncaughtException', (err) => {
+    console.error('[silo] uncaught exception:', err)
+  })
 
   // ── FOCUS GUARD ──
   // Prevent the BrowserWindow from being shown/focused by Electron internals

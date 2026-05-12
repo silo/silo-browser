@@ -19,7 +19,13 @@ export default defineConfig({
         input: {
           index: resolve('src/preload/index.ts'),
           webview: resolve('src/preload/webview.ts')
-        }
+        },
+        // Externalize the `electron` module — its runtime API is provided by
+        // the Electron process and must not be bundled. With Vite 8 /
+        // Rolldown defaults, bundling pulls in `electron/index.js` (the
+        // binary path resolver) which crashes preload startup with
+        // "Unable to find Electron app at out/preload/chunks/install.js".
+        external: ['electron', /^node:/]
       }
     }
   },
@@ -39,7 +45,7 @@ export default defineConfig({
       vue({
         template: {
           compilerOptions: {
-            isCustomElement: (tag) => tag === 'webview'
+            isCustomElement: (tag) => tag === 'webview' || tag === 'browser-action-list'
           }
         }
       }),

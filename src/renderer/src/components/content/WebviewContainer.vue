@@ -106,7 +106,29 @@ const handleDomReady = (() => {
   if (props.tab.isMuted) wv.setAudioMuted(true)
   wv.setZoomLevel(props.tab.zoomLevel ?? 0)
   if (effectiveUserAgent.value) wv.setUserAgent(effectiveUserAgent.value)
+  if (props.isActive) {
+    try {
+      const id = wv.getWebContentsId()
+      window.api.extensionsSelectTab(id)
+    } catch {
+      // ignore — App.vue watcher will catch the next activation
+    }
+  }
 }) as EventListener
+
+watch(
+  () => props.isActive,
+  (active) => {
+    if (!active) return
+    const wv = webviewRef.value
+    if (!wv) return
+    try {
+      window.api.extensionsSelectTab(wv.getWebContentsId())
+    } catch {
+      // webview not yet attached; dom-ready will retry
+    }
+  }
+)
 
 watch(
   () => props.tab.notificationsEnabled,

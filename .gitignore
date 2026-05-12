@@ -6,3 +6,5 @@ out
 *.log*
 *.cer
 *.p12
+electron-browser-shell-master
+electron-browser-shell-master.zip

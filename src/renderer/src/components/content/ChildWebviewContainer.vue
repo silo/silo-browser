@@ -105,7 +105,28 @@ const handleDomReady = (() => {
   if (parentTab.value?.isMuted) wv.setAudioMuted(true)
   wv.setZoomLevel(parentTab.value?.zoomLevel ?? 0)
   if (effectiveUserAgent.value) wv.setUserAgent(effectiveUserAgent.value)
+  if (props.isActive) {
+    try {
+      window.api.extensionsSelectTab(wv.getWebContentsId())
+    } catch {
+      // ignore
+    }
+  }
 }) as EventListener
+
+watch(
+  () => props.isActive,
+  (active) => {
+    if (!active) return
+    const wv = webviewRef.value
+    if (!wv) return
+    try {
+      window.api.extensionsSelectTab(wv.getWebContentsId())
+    } catch {
+      // ignore
+    }
+  }
+)
 
 watch(
   () => parentTab.value?.notificationsEnabled,

@@ -1,11 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { join } from 'path'
 import { electronAPI } from '@electron-toolkit/preload'
+import { injectBrowserAction } from 'electron-chrome-extensions/browser-action'
+
+// Registers the <browser-action-list> custom element used by the navigation bar
+// to show installed extension toolbar icons.
+injectBrowserAction()
 
 const api = {
   platform: process.platform as string,
-  webviewPreloadPath: `file://${join(__dirname, 'webview.js')}`,
+  webviewPreloadPath: `file://${join(__dirname, 'webview.mjs')}`,
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
+  relaunchApp: (): Promise<void> => ipcRenderer.invoke('app:relaunch'),
   getState: (): Promise<unknown> => ipcRenderer.invoke('store:get-state'),
   saveGroups: (groups: unknown): Promise<void> => ipcRenderer.invoke('store:save-groups', groups),
   saveActiveTab: (tabId: string | null): Promise<void> =>
@@ -31,6 +37,26 @@ const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   exportConfig: (): Promise<string | null> => ipcRenderer.invoke('dialog:export-config'),
   importConfig: (): Promise<unknown | null> => ipcRenderer.invoke('dialog:import-config'),
+  extensionsList: (): Promise<unknown[]> => ipcRenderer.invoke('extensions:list'),
+  extensionsInstallFromWebstore: (input: string): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:install-from-webstore', input),
+  extensionsInstallFromUrl: (url: string): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:install-from-url', url),
+  extensionsInstallUnpacked: (): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:install-unpacked'),
+  extensionsSetEnabled: (id: string, enabled: boolean): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:set-enabled', id, enabled),
+  extensionsRemove: (id: string): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:remove', id),
+  extensionsClearData: (id: string): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:clear-data', id),
+  extensionsSetActiveGroups: (id: string, groupIds: string[]): Promise<unknown> =>
+    ipcRenderer.invoke('extensions:set-active-groups', id, groupIds),
+  extensionsSelectTab: (webContentsId: number): void => {
+    // Fire-and-forget — selectTab is high-frequency on tab switches and
+    // doesn't need a response.
+    ipcRenderer.send('extensions:select-tab', webContentsId)
+  },
   onOpenInNewTab: (callback: (url: string) => void): void => {
     ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
       callback(url)

@@ -331,9 +331,20 @@ export const useUiStore = defineStore('ui', () => {
   const settingsPageOpen = ref(false)
   function openSettingsPage(): void {
     settingsPageOpen.value = true
+    extensionsPageOpen.value = false
   }
   function closeSettingsPage(): void {
     settingsPageOpen.value = false
+  }
+
+  // --- Extensions page ---
+  const extensionsPageOpen = ref(false)
+  function openExtensionsPage(): void {
+    extensionsPageOpen.value = true
+    settingsPageOpen.value = false
+  }
+  function closeExtensionsPage(): void {
+    extensionsPageOpen.value = false
   }
 
   // --- Update state ---
@@ -431,6 +442,9 @@ export const useUiStore = defineStore('ui', () => {
     settingsPageOpen,
     openSettingsPage,
     closeSettingsPage,
+    extensionsPageOpen,
+    openExtensionsPage,
+    closeExtensionsPage,
     updaterUpToDate,
     setUpdaterUpToDate,
     updateDialogOpen,

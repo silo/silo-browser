@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
@@ -22,6 +22,9 @@ const EditTabDialog = defineAsyncComponent(
 )
 const SettingsPage = defineAsyncComponent(
   () => import('@renderer/components/settings/SettingsPage.vue')
+)
+const ExtensionsPage = defineAsyncComponent(
+  () => import('@renderer/components/settings/ExtensionsPage.vue')
 )
 const ConfirmRemoveTabDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/ConfirmRemoveTabDialog.vue')
@@ -115,6 +118,37 @@ onUnmounted(() => {
   window.api.removePermissionRequestListener()
   window.api.removeFindListener()
 })
+
+// Tell extension hosts (e.g. Bitwarden popup) which webview is the active tab.
+// Without this, chrome.tabs.query({active: true}) returns stale data so
+// autofill thinks you're on a different site than the URL bar shows.
+function notifyExtensionsOfActiveTab(): void {
+  if (uiStore.settingsPageOpen || uiStore.extensionsPageOpen) return
+  const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+  if (!wv) return
+  try {
+    const id = wv.getWebContentsId()
+    if (typeof id === 'number' && id >= 0) {
+      window.api.extensionsSelectTab(id)
+    }
+  } catch {
+    // webContents not attached yet; the webview's dom-ready handler will retry.
+  }
+}
+
+watch(
+  [
+    () => groupsStore.activeTabId,
+    () => topbarStore.activeTopbarTabId,
+    () => uiStore.settingsPageOpen,
+    () => uiStore.extensionsPageOpen
+  ],
+  async () => {
+    await nextTick()
+    notifyExtensionsOfActiveTab()
+  },
+  { immediate: true }
+)
 
 function applyZoom(delta: number, reset = false): void {
   const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
@@ -228,6 +262,7 @@ function handleKeydown(e: KeyboardEvent): void {
     if (uiStore.findBarOpen) { uiStore.closeFindBar(); return }
     if (uiStore.urlBarOpen) { uiStore.closeUrlBar(); return }
     if (uiStore.settingsPageOpen) { uiStore.closeSettingsPage(); return }
+    if (uiStore.extensionsPageOpen) { uiStore.closeExtensionsPage(); return }
   }
 }
 </script>
@@ -236,7 +271,8 @@ function handleKeydown(e: KeyboardEvent): void {
   <div class="flex h-screen w-screen overflow-hidden bg-surface-base text-fg-primary">
     <TheSidebar />
     <SettingsPage v-if="uiStore.settingsPageOpen" />
-    <TheContentArea v-show="!uiStore.settingsPageOpen" />
+    <ExtensionsPage v-else-if="uiStore.extensionsPageOpen" />
+    <TheContentArea v-else />
   </div>
   <ContextMenu />
   <AddGroupDialog v-if="uiStore.addGroupDialogOpen" />

@@ -3,10 +3,45 @@ import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { getCachedState, saveState } from './store'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
+import {
+  clearExtensionData,
+  extensions,
+  handleGroupDeleted,
+  installFromUrl,
+  installFromWebStore,
+  installUnpacked,
+  isCancellation,
+  listExtensions,
+  removeExtension,
+  setActiveGroups,
+  setExtensionEnabled
+} from './extensions'
+
+/**
+ * Compare the previous groups list to the new one (as sent by the renderer)
+ * and return the ids that were removed. Used so we can run extension cleanup
+ * for deleted groups on the same IPC round-trip that persists the change.
+ */
+function findRemovedGroupIds(prev: unknown[], next: unknown[]): string[] {
+  const idOf = (g: unknown): string | null =>
+    typeof g === 'object' && g !== null && typeof (g as { id?: unknown }).id === 'string'
+      ? (g as { id: string }).id
+      : null
+  const nextIds = new Set(next.map(idOf).filter((id): id is string => id !== null))
+  return prev
+    .map(idOf)
+    .filter((id): id is string => id !== null)
+    .filter((id) => !nextIds.has(id))
+}
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => {
     return app.getVersion()
+  })
+
+  ipcMain.handle('app:relaunch', () => {
+    app.relaunch()
+    app.exit(0)
   })
 
   ipcMain.handle('store:get-state', () => {
@@ -14,7 +49,9 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('store:save-groups', async (_event, groups: unknown[]) => {
+    const removedIds = findRemovedGroupIds(getCachedState().groups, groups)
     await saveState({ groups })
+    for (const id of removedIds) await handleGroupDeleted(id)
   })
 
   ipcMain.handle('store:save-active-tab', async (_event, tabId: string | null) => {
@@ -24,7 +61,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'store:save-groups-and-active-tab',
     async (_event, groups: unknown[], activeTabId: string | null) => {
+      const removedIds = findRemovedGroupIds(getCachedState().groups, groups)
       await saveState({ groups, activeTabId })
+      for (const id of removedIds) await handleGroupDeleted(id)
     }
   )
 
@@ -86,6 +125,88 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('updater:open-releases-page', () => {
     openReleasesPage()
+  })
+
+  ipcMain.handle('extensions:list', async () => {
+    return listExtensions()
+  })
+
+  ipcMain.handle('extensions:install-from-webstore', async (_event, input: string) => {
+    try {
+      const entry = await installFromWebStore(input)
+      return { ok: true, entry }
+    } catch (err) {
+      if (isCancellation(err)) return { ok: true, cancelled: true, entry: null }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('extensions:install-from-url', async (_event, url: string) => {
+    try {
+      const entry = await installFromUrl(url)
+      return { ok: true, entry }
+    } catch (err) {
+      if (isCancellation(err)) return { ok: true, cancelled: true, entry: null }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('extensions:install-unpacked', async () => {
+    try {
+      const entry = await installUnpacked()
+      return { ok: true, entry }
+    } catch (err) {
+      if (isCancellation(err)) return { ok: true, cancelled: true, entry: null }
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle(
+    'extensions:set-enabled',
+    async (_event, extensionId: string, enabled: boolean) => {
+      try {
+        const entry = await setExtensionEnabled(extensionId, enabled)
+        return { ok: true, entry }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
+
+  ipcMain.handle('extensions:remove', async (_event, extensionId: string) => {
+    try {
+      await removeExtension(extensionId)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('extensions:clear-data', async (_event, extensionId: string) => {
+    try {
+      const entry = await clearExtensionData(extensionId)
+      return { ok: true, entry }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle(
+    'extensions:set-active-groups',
+    async (_event, extensionId: string, groupIds: string[]) => {
+      try {
+        const entry = await setActiveGroups(extensionId, groupIds)
+        return { ok: true, entry }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
+
+  // Sent on every active-tab change so extensions see the right URL when
+  // their popup calls chrome.tabs.query({ active: true }).
+  ipcMain.on('extensions:select-tab', (_event, webContentsId: number) => {
+    extensions.selectActiveTab(webContentsId)
   })
 
   ipcMain.handle('dialog:export-config', async () => {

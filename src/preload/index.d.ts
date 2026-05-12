@@ -1,10 +1,30 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { AppState, GroupItem } from '../renderer/src/types'
 
+export interface InstalledExtensionEntry {
+  id: string
+  name: string
+  version: string
+  description?: string
+  enabled: boolean
+  path: string
+  source: 'webstore' | 'unpacked' | 'url'
+  activeGroupIds?: string[]
+}
+
+export interface ExtensionsResult {
+  ok: boolean
+  error?: string
+  /** True when the user cancelled the install via the compatibility prompt. */
+  cancelled?: boolean
+  entry?: InstalledExtensionEntry | null
+}
+
 export interface SiloApi {
   platform: string
   webviewPreloadPath: string
   getAppVersion: () => Promise<string>
+  relaunchApp: () => Promise<void>
   getState: () => Promise<AppState>
   saveGroups: (groups: GroupItem[]) => Promise<void>
   saveActiveTab: (tabId: string | null) => Promise<void>
@@ -20,6 +40,15 @@ export interface SiloApi {
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>
   importConfig: () => Promise<unknown | null>
+  extensionsList: () => Promise<InstalledExtensionEntry[]>
+  extensionsInstallFromWebstore: (input: string) => Promise<ExtensionsResult>
+  extensionsInstallFromUrl: (url: string) => Promise<ExtensionsResult>
+  extensionsInstallUnpacked: () => Promise<ExtensionsResult>
+  extensionsSetEnabled: (id: string, enabled: boolean) => Promise<ExtensionsResult>
+  extensionsRemove: (id: string) => Promise<ExtensionsResult>
+  extensionsClearData: (id: string) => Promise<ExtensionsResult>
+  extensionsSetActiveGroups: (id: string, groupIds: string[]) => Promise<ExtensionsResult>
+  extensionsSelectTab: (webContentsId: number) => void
   onOpenInNewTab: (callback: (url: string) => void) => void
   removeOpenInNewTabListener: () => void
   onUpdateDownloaded: (callback: (version: string) => void) => void

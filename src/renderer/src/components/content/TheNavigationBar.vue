@@ -3,11 +3,13 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
+import { useExtensionsStore } from '@renderer/stores/extensions'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
 const uiStore = useUiStore()
+const extensionsStore = useExtensionsStore()
 const webviewRegistry = useWebviewRegistry()
 const isMac = window.api.platform === 'darwin'
 
@@ -19,6 +21,11 @@ const zoomPercent = computed(() => {
   if (!tab) return 100
   const level = tab.zoomLevel ?? 0
   return Math.round(Math.pow(1.2, level) * 100)
+})
+
+const activeGroupPartition = computed(() => {
+  const tab = groupsStore.activeTab
+  return tab ? `persist:silo-group-${tab.groupId}` : ''
 })
 
 const displayUrl = computed(() => {
@@ -250,6 +257,14 @@ function childTabLabel(child: { currentTitle?: string; url: string }): string {
       <span class="group-hover:hidden">{{ zoomPercent }}%</span>
       <span class="hidden group-hover:inline">Reset</span>
     </button>
+
+    <!-- Browser action icons (installed extensions) -->
+    <browser-action-list
+      v-if="activeGroupPartition"
+      :key="`${activeGroupPartition}-${extensionsStore.refreshTick}`"
+      :partition="activeGroupPartition"
+      class="app-no-drag flex items-center silo-browser-action-list"
+    />
 
     <!-- URL bar button (compact) -->
     <button

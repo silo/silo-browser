@@ -3,6 +3,24 @@ import { readFileSync, existsSync } from 'fs'
 import { writeFile, mkdir } from 'fs/promises'
 import { join, dirname } from 'path'
 
+export interface InstalledExtensionEntry {
+  id: string
+  name: string
+  version: string
+  description?: string
+  enabled: boolean
+  path: string
+  source: 'webstore' | 'unpacked' | 'url'
+  /**
+   * Group IDs where this extension is loaded. The extension's service worker,
+   * content scripts, cookies, and storage all live in the corresponding
+   * per-group session — groups not in this list are completely isolated from
+   * the extension. `undefined` is treated as "all current groups" for legacy
+   * persisted entries; new installs always write an explicit array.
+   */
+  activeGroupIds?: string[]
+}
+
 export interface PersistedState {
   groups: unknown[]
   activeTabId: string | null
@@ -17,6 +35,7 @@ export interface PersistedState {
   defaultSleepAfterMinutes: number
   confirmCloseChildTabs: boolean
   defaultUserAgent: string
+  installedExtensions: InstalledExtensionEntry[]
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
@@ -36,7 +55,8 @@ const defaultState: PersistedState = {
   grantedPermissions: [],
   defaultSleepAfterMinutes: 0,
   confirmCloseChildTabs: false,
-  defaultUserAgent: ''
+  defaultUserAgent: '',
+  installedExtensions: []
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -83,7 +103,16 @@ export function loadState(): PersistedState {
       confirmCloseChildTabs:
         typeof parsed.confirmCloseChildTabs === 'boolean' ? parsed.confirmCloseChildTabs : false,
       defaultUserAgent:
-        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : ''
+        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : '',
+      installedExtensions: Array.isArray(parsed.installedExtensions)
+        ? parsed.installedExtensions.filter(
+            (e: unknown): e is InstalledExtensionEntry =>
+              typeof e === 'object' &&
+              e !== null &&
+              typeof (e as InstalledExtensionEntry).id === 'string' &&
+              typeof (e as InstalledExtensionEntry).path === 'string'
+          )
+        : []
     }
     cachedState = { ...state }
     return state
