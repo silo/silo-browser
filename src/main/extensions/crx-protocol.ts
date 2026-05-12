@@ -1,5 +1,6 @@
 import { net, session as electronSession } from 'electron'
 import { join } from 'path'
+import type { ChromeManifest } from './compatibility'
 
 /**
  * Serve `crx://extension-icon/<id>/<size>/<grayed>?partition=<p>` requests in
@@ -38,21 +39,15 @@ export function registerSmartCrxProtocolOnMainSession(): void {
     const extension = groupSession.extensions.getExtension(extensionId)
     if (!extension) return new Response(null, { status: 404 })
 
-    const iconPath = pickIconPath(extension.manifest as ManifestWithIcons, requestedSize)
+    const iconPath = pickIconPath(extension.manifest as ChromeManifest, requestedSize)
     if (!iconPath) return new Response(null, { status: 404 })
 
     return net.fetch(`file://${join(extension.path, iconPath)}`)
   })
 }
 
-interface ManifestWithIcons {
-  icons?: Record<string, string>
-  action?: { default_icon?: string | Record<string, string> }
-  browser_action?: { default_icon?: string | Record<string, string> }
-}
-
 /** Pick the smallest icon that's ≥ requestedSize, falling back to the largest. */
-function pickIconPath(manifest: ManifestWithIcons, requestedSize: number): string | null {
+function pickIconPath(manifest: ChromeManifest, requestedSize: number): string | null {
   const sources: Array<Record<string, string> | undefined> = [
     manifest.icons,
     asMap(manifest.action?.default_icon),

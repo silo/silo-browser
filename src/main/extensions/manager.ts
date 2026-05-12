@@ -5,9 +5,12 @@ import {
 } from 'electron'
 import { ElectronChromeExtensions } from 'electron-chrome-extensions'
 import { getCachedState, type InstalledExtensionEntry } from '../store'
+import {
+  activeGroupIdsInclude,
+  groupPartition as composeGroupPartition
+} from '../../shared/partitions'
 import { registerSmartCrxProtocolOnMainSession } from './crx-protocol'
-
-export const GROUP_PARTITION_PREFIX = 'persist:silo-group-'
+import type { ChromeManifest } from './compatibility'
 
 /**
  * Per-session extension wiring.
@@ -69,15 +72,6 @@ export class ExtensionsManager {
     registerSmartCrxProtocolOnMainSession()
   }
 
-  /**
-   * Backwards-compatible alias. Some older call sites used
-   * `ensureMainSessionInitialised`; kept as a tiny shim while the rest of
-   * the codebase migrates.
-   */
-  ensureMainSessionInitialised(): void {
-    this.ensureMainSessionReady()
-  }
-
   // ── Session helpers ──────────────────────────────────────────────────────
 
   mainSession(): Electron.Session {
@@ -85,19 +79,20 @@ export class ExtensionsManager {
   }
 
   groupSession(groupId: string): Electron.Session {
-    return electronSession.fromPartition(`${GROUP_PARTITION_PREFIX}${groupId}`)
+    return electronSession.fromPartition(composeGroupPartition(groupId))
   }
 
-  groupPartition(groupId: string): string {
-    return `${GROUP_PARTITION_PREFIX}${groupId}`
+  /** All current group ids. Used to default activeGroupIds at install time. */
+  allGroupIds(): string[] {
+    const groups = (getCachedState().groups as Array<{ id?: string }>) ?? []
+    return groups
+      .filter((g): g is { id: string } => typeof g.id === 'string')
+      .map((g) => g.id)
   }
 
   /** Every persisted group's session. */
   allGroupSessions(): Electron.Session[] {
-    const groups = (getCachedState().groups as Array<{ id?: string }>) ?? []
-    return groups
-      .filter((g) => typeof g.id === 'string')
-      .map((g) => this.groupSession(g.id as string))
+    return this.allGroupIds().map((id) => this.groupSession(id))
   }
 
   /** Group sessions + main session — every place extensions need to be loaded. */
@@ -107,27 +102,16 @@ export class ExtensionsManager {
 
   /** Partition strings for the on-disk storage cleanup helpers. */
   allPartitionStrings(): string[] {
-    const groups = (getCachedState().groups as Array<{ id?: string }>) ?? []
-    return groups
-      .filter((g) => typeof g.id === 'string')
-      .map((g) => this.groupPartition(g.id as string))
-  }
-
-  /** All current group ids. Used to default activeGroupIds at install time. */
-  allGroupIds(): string[] {
-    const groups = (getCachedState().groups as Array<{ id?: string }>) ?? []
-    return groups.filter((g) => typeof g.id === 'string').map((g) => g.id as string)
+    return this.allGroupIds().map(composeGroupPartition)
   }
 
   /**
-   * Whether this entry should be loaded in a given group session.
-   * `activeGroupIds === undefined` is legacy — treated as "all groups" so we
-   * preserve behaviour for upgraded installs.
+   * Whether this entry should be loaded in a given group session right now.
+   * Combines `enabled` with the shared activation predicate that treats
+   * `activeGroupIds === undefined` as "all groups" (legacy behaviour).
    */
   isActiveInGroup(entry: InstalledExtensionEntry, groupId: string): boolean {
-    if (!entry.enabled) return false
-    if (entry.activeGroupIds === undefined) return true
-    return entry.activeGroupIds.includes(groupId)
+    return entry.enabled && activeGroupIdsInclude(entry, groupId)
   }
 
   /** Reverse lookup: which group does this session belong to (if any)? */
@@ -392,10 +376,7 @@ export class ExtensionsManager {
     session: Electron.Session,
     extension: Electron.Extension
   ): Promise<void> {
-    const manifest = extension.manifest as {
-      manifest_version?: number
-      background?: { service_worker?: string }
-    }
+    const manifest = extension.manifest as ChromeManifest
     if (manifest.manifest_version !== 3 || !manifest.background?.service_worker) return
     await session.serviceWorkers
       .startWorkerForScope(extension.url)

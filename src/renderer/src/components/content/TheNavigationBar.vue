@@ -5,6 +5,7 @@ import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
 import { useExtensionsStore } from '@renderer/stores/extensions'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { groupPartition } from '@shared/partitions'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
@@ -25,7 +26,7 @@ const zoomPercent = computed(() => {
 
 const activeGroupPartition = computed(() => {
   const tab = groupsStore.activeTab
-  return tab ? `persist:silo-group-${tab.groupId}` : ''
+  return tab ? groupPartition(tab.groupId) : ''
 })
 
 const displayUrl = computed(() => {

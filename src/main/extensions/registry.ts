@@ -1,5 +1,6 @@
 import type { Extension } from 'electron'
 import { getCachedState, saveState, type InstalledExtensionEntry } from '../store'
+import type { ChromeManifest } from './compatibility'
 
 /**
  * Read/write helpers for the persisted list of installed extensions.
@@ -31,7 +32,7 @@ export function entryFromLoaded(
   source: InstalledExtensionEntry['source'],
   enabled = true
 ): InstalledExtensionEntry {
-  const manifest = loaded.manifest as { description?: string }
+  const manifest = loaded.manifest as ChromeManifest
   return {
     id: loaded.id,
     name: loaded.name,

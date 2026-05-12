@@ -113,7 +113,7 @@ export const useExtensionsStore = defineStore('extensions', () => {
     options: { onSuccess?: () => void } = {}
   ): Promise<void> {
     lastError.value = null
-    busyByExtension.value = { ...busyByExtension.value, [id]: label }
+    busyByExtension.value[id] = label
     try {
       const result = await invoke()
       if (!result.ok) {
@@ -122,9 +122,7 @@ export const useExtensionsStore = defineStore('extensions', () => {
       }
       options.onSuccess?.()
     } finally {
-      const next = { ...busyByExtension.value }
-      delete next[id]
-      busyByExtension.value = next
+      delete busyByExtension.value[id]
       await refresh()
       bumpRefresh()
     }

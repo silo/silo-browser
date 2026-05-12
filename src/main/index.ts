@@ -603,7 +603,7 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   const mainWindow = createWindow()
   extensions.setMainWindowResolver(() => (mainWindow.isDestroyed() ? null : mainWindow))
-  extensions.ensureMainSessionInitialised()
+  extensions.ensureMainSessionReady()
   setTimeout(() => initAutoUpdater(mainWindow), 3000)
 
   // Surface any child-process death (renderer, GPU, utility, plugin). If the

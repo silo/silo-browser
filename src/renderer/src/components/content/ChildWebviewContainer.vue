@@ -6,6 +6,7 @@ import { useUiStore } from '@renderer/stores/ui'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import type { ChildTab } from '@renderer/types'
+import { groupPartition } from '@shared/partitions'
 
 const props = defineProps<{
   childTab: ChildTab
@@ -20,7 +21,7 @@ const webviewRef = ref<Electron.WebviewTag | null>(null)
 
 const parentTab = computed(() => groupsStore.findTab(props.childTab.parentTabId))
 
-const partition = computed(() => `persist:silo-group-${props.childTab.groupId}`)
+const partition = computed(() => groupPartition(props.childTab.groupId))
 const webviewPreload = window.api.webviewPreloadPath
 
 const effectiveUserAgent = computed(() => {

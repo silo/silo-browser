@@ -6,5 +6,6 @@ out
 *.log*
 *.cer
 *.p12
+*.ips
 electron-browser-shell-master
 electron-browser-shell-master.zip

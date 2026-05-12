@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { getCachedState, saveState } from './store'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
+import { groupPartition } from '../shared/partitions'
 import {
   clearExtensionData,
   extensions,
@@ -106,8 +107,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('store:clear-group-session', async (_event, groupId: string) => {
-    const partition = `persist:silo-group-${groupId}`
-    const ses = session.fromPartition(partition)
+    const ses = session.fromPartition(groupPartition(groupId))
     await ses.clearStorageData()
   })
 

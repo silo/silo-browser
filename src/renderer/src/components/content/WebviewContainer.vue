@@ -5,6 +5,7 @@ import { useUiStore } from '@renderer/stores/ui'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import type { TabItem } from '@renderer/types'
+import { groupPartition } from '@shared/partitions'
 
 const props = defineProps<{
   tab: TabItem
@@ -16,7 +17,7 @@ const uiStore = useUiStore()
 const { registerMain, unregisterMain } = useWebviewRegistry()
 const webviewRef = ref<Electron.WebviewTag | null>(null)
 
-const partition = computed(() => `persist:silo-group-${props.tab.groupId}`)
+const partition = computed(() => groupPartition(props.tab.groupId))
 const webviewPreload = window.api.webviewPreloadPath
 
 const effectiveUserAgent = computed(() => {

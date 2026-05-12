@@ -5,6 +5,7 @@ import { useExtensionsStore } from '@renderer/stores/extensions'
 import { useGroupsStore } from '@renderer/stores/groups'
 import Spinner from '@renderer/components/Spinner.vue'
 import type { InstalledExtensionEntry } from '../../../../preload/index.d'
+import { activeGroupIdsInclude } from '@shared/partitions'
 
 const uiStore = useUiStore()
 const extensionsStore = useExtensionsStore()
@@ -12,15 +13,13 @@ const groupsStore = useGroupsStore()
 const isMac = window.api.platform === 'darwin'
 
 /**
- * activeGroupIds === undefined is the legacy "all groups" marker. Treat it
- * as every current group id for the purpose of the checkboxes.
+ * Materialise the entry's active set against the currently-known groups.
+ * `activeGroupIds === undefined` is the legacy "all groups" marker — expand
+ * it for the checkbox toggle, but rely on the shared `activeGroupIdsInclude`
+ * for read-only checks so its semantics stay in sync with the main process.
  */
 function effectiveActiveGroupIds(entry: InstalledExtensionEntry): string[] {
   return entry.activeGroupIds ?? groupsStore.sortedGroups.map((g) => g.id)
-}
-
-function isActiveInGroup(entry: InstalledExtensionEntry, groupId: string): boolean {
-  return effectiveActiveGroupIds(entry).includes(groupId)
 }
 
 function toggleGroup(
@@ -306,7 +305,7 @@ function sourceLabel(source: 'webstore' | 'url' | 'unpacked'): string {
                     >
                       <input
                         type="checkbox"
-                        :checked="isActiveInGroup(entry, group.id)"
+                        :checked="activeGroupIdsInclude(entry, group.id)"
                         :disabled="extensionsStore.isBusy(entry.id)"
                         @change="toggleGroup(entry, group.id, ($event.target as HTMLInputElement).checked)"
                         class="w-3.5 h-3.5 cursor-pointer disabled:opacity-50"

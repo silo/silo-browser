@@ -15,7 +15,7 @@ import {
 } from './registry'
 import { downloadAndUnpackCrx } from './crx'
 import { deleteExtensionDataOnDisk } from './storage'
-import { analyzeManifest, describeReport, type ManifestLike } from './compatibility'
+import { analyzeManifest, describeReport, type ChromeManifest } from './compatibility'
 import { prependCompatStubsToServiceWorker } from './sw-stub-injection'
 
 /**
@@ -30,6 +30,25 @@ const EXTENSION_ID_RE = /^[a-z]{32}$/i
 const WEBSTORE_URL_RE = /chromewebstore\.google\.com\/detail\/[^/]+\/([a-z]{32})/i
 const POST_CLEAR_SETTLE_MS = 150
 
+// ── Install serialization ────────────────────────────────────────────────
+//
+// All three install paths share the same install directory (`<userData>/
+// Extensions/<id>/<version>/`) and briefly load into the main session to
+// learn the manifest. Two concurrent installs of the same extension race
+// on `wipeInstallDir` / `downloadExtension` / `loadIntoMainSessionWithRetry`
+// and surface as ENOTEMPTY or "extension already loaded" errors.
+//
+// Serializing the whole install pipeline is simpler than per-id locking
+// and the user-visible cost is trivial: a second click queues behind the
+// first instead of failing halfway.
+let installChain: Promise<unknown> = Promise.resolve()
+
+function runExclusiveInstall<T>(task: () => Promise<T>): Promise<T> {
+  const next = installChain.then(task, task)
+  installChain = next.catch(() => {})
+  return next
+}
+
 // ── Public read-only ─────────────────────────────────────────────────────
 
 export async function listExtensions(): Promise<InstalledExtensionEntry[]> {
@@ -42,27 +61,29 @@ export async function listExtensions(): Promise<InstalledExtensionEntry[]> {
  * Install from the Chrome Web Store given either a raw extension id or a
  * `chromewebstore.google.com/detail/<name>/<id>` URL.
  */
-export async function installFromWebStore(input: string): Promise<InstalledExtensionEntry> {
-  const id = parseWebStoreInput(input)
-  if (!id) throw new Error('Invalid extension ID or Chrome Web Store URL')
+export function installFromWebStore(input: string): Promise<InstalledExtensionEntry> {
+  return runExclusiveInstall(async () => {
+    const id = parseWebStoreInput(input)
+    if (!id) throw new Error('Invalid extension ID or Chrome Web Store URL')
 
-  // Unload existing copy so loadExtension doesn't throw on re-install.
-  extensionsManager.unloadEverywhere(id)
+    // Unload existing copy so loadExtension doesn't throw on re-install.
+    extensionsManager.unloadEverywhere(id)
 
-  // Clean stale install dirs left by a previous crashed install. If the
-  // registry has no entry for this id, anything on disk is garbage that will
-  // make the downloader's rename fail with ENOTEMPTY.
-  if (!findEntry(id)) {
-    await wipeInstallDir(id)
-  }
+    // Clean stale install dirs left by a previous crashed install. If the
+    // registry has no entry for this id, anything on disk is garbage that will
+    // make the downloader's rename fail with ENOTEMPTY.
+    if (!findEntry(id)) {
+      await wipeInstallDir(id)
+    }
 
-  const extensionPath = await downloadExtensionWithRetry(id)
-  try {
-    return await registerInstall(extensionPath, 'webstore')
-  } catch (err) {
-    if (isCancellation(err)) await wipeInstallDir(id)
-    throw err
-  }
+    const extensionPath = await downloadExtensionWithRetry(id)
+    try {
+      return await registerInstall(extensionPath, 'webstore')
+    } catch (err) {
+      if (isCancellation(err)) await wipeInstallDir(id)
+      throw err
+    }
+  })
 }
 
 /**
@@ -70,60 +91,67 @@ export async function installFromWebStore(input: string): Promise<InstalledExten
  * `<userData>/Extensions/<id>/<version>/`, the same layout the Web Store
  * installer uses.
  */
-export async function installFromUrl(url: string): Promise<InstalledExtensionEntry> {
-  if (!/^https?:\/\//i.test(url)) {
-    throw new Error('URL must start with http:// or https://')
-  }
+export function installFromUrl(url: string): Promise<InstalledExtensionEntry> {
+  return runExclusiveInstall(async () => {
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error('URL must start with http:// or https://')
+    }
 
-  const stagingDir = await downloadAndUnpackCrx(url)
+    const stagingDir = await downloadAndUnpackCrx(url)
 
-  // Briefly load the staged copy to learn the id and version, then unload.
-  let loaded: Electron.Extension
-  try {
-    loaded = await loadIntoMainSessionWithRetry(stagingDir)
-  } catch (err) {
-    await rm(stagingDir, { recursive: true, force: true }).catch(() => {})
-    throw err
-  }
+    // Briefly load the staged copy to learn the id and version, then unload.
+    let loaded: Electron.Extension
+    try {
+      loaded = await loadIntoMainSessionWithRetry(stagingDir)
+    } catch (err) {
+      await rm(stagingDir, { recursive: true, force: true }).catch((rmErr) =>
+        console.warn(`[extensions] failed to clean up staging dir ${stagingDir}:`, rmErr)
+      )
+      throw err
+    }
 
-  const finalDir = join(extensionsDir(), loaded.id, loaded.version)
-  await mkdir(join(extensionsDir(), loaded.id), { recursive: true })
-  if (existsSync(finalDir)) {
-    await rm(finalDir, { recursive: true, force: true })
-  }
-  // Unload the staged copy from the main session before renaming — Electron
-  // keeps the directory busy while the extension is loaded.
-  extensionsManager.mainSession().extensions.removeExtension(loaded.id)
-  try {
-    await rename(stagingDir, finalDir)
-  } catch {
-    // Rename across filesystems can fail — leave files where they are; the
-    // path is recorded in the registry either way.
-  }
+    const finalDir = join(extensionsDir(), loaded.id, loaded.version)
+    await mkdir(join(extensionsDir(), loaded.id), { recursive: true })
+    if (existsSync(finalDir)) {
+      await rm(finalDir, { recursive: true, force: true })
+    }
+    // Unload the staged copy from the main session before renaming — Electron
+    // keeps the directory busy while the extension is loaded.
+    extensionsManager.mainSession().extensions.removeExtension(loaded.id)
+    try {
+      await rename(stagingDir, finalDir)
+    } catch (err) {
+      // Rename across filesystems can fail — leave files where they are; the
+      // path is recorded in the registry either way.
+      console.warn(`[extensions] rename of staging dir failed (using staging path):`, err)
+    }
 
-  const settledPath = existsSync(finalDir) ? finalDir : stagingDir
-  try {
-    return await registerInstall(settledPath, 'url')
-  } catch (err) {
-    if (isCancellation(err)) await wipeInstallDir(loaded.id)
-    throw err
-  }
+    const settledPath = existsSync(finalDir) ? finalDir : stagingDir
+    try {
+      return await registerInstall(settledPath, 'url')
+    } catch (err) {
+      if (isCancellation(err)) await wipeInstallDir(loaded.id)
+      throw err
+    }
+  })
 }
 
 /**
  * Prompt the user to pick a folder containing `manifest.json` and load it
  * in-place. We don't copy — developers usually want to keep editing.
  */
-export async function installUnpacked(): Promise<InstalledExtensionEntry | null> {
-  const filePaths = await pickExtensionFolder()
-  if (!filePaths) return null
-  const sourcePath = filePaths[0]
+export function installUnpacked(): Promise<InstalledExtensionEntry | null> {
+  return runExclusiveInstall(async () => {
+    const filePaths = await pickExtensionFolder()
+    if (!filePaths) return null
+    const sourcePath = filePaths[0]
 
-  if (!existsSync(join(sourcePath, 'manifest.json'))) {
-    throw new Error('Selected folder does not contain manifest.json')
-  }
+    if (!existsSync(join(sourcePath, 'manifest.json'))) {
+      throw new Error('Selected folder does not contain manifest.json')
+    }
 
-  return await registerInstall(sourcePath, 'unpacked')
+    return await registerInstall(sourcePath, 'unpacked')
+  })
 }
 
 /** Sentinel — `registerInstall` throws this when the user cancels the
@@ -146,7 +174,7 @@ async function registerInstall(
   // Load briefly into the main session to learn id / name / version / manifest,
   // then immediately unload — we don't want extensions to actually run there.
   const loaded = await loadIntoMainSessionWithRetry(path)
-  const manifest = loaded.manifest as ManifestLike
+  const manifest = loaded.manifest as ChromeManifest
   const entry: InstalledExtensionEntry = {
     ...entryFromLoaded(loaded, source),
     path,
@@ -183,7 +211,7 @@ async function registerInstall(
  * Returns true if the user wants to proceed with installing. When the
  * manifest is fully compatible we never prompt and return true immediately.
  */
-async function confirmIfIncompatible(manifest: ManifestLike): Promise<boolean> {
+async function confirmIfIncompatible(manifest: ChromeManifest): Promise<boolean> {
   const report = analyzeManifest(manifest)
   if (report.fullyCompatible) return true
 
@@ -271,9 +299,11 @@ export async function handleGroupDeleted(groupId: string): Promise<void> {
 }
 
 /**
- * Wipe stored data without uninstalling. The disable → clear → enable round-trip
- * also forces the `<browser-action-list>` element to re-render the icon, which
- * a bare clear-and-reload sometimes misses.
+ * Wipe stored data without uninstalling. We unload everywhere so Chromium
+ * releases file handles before wiping, then reload into the entry's active
+ * sessions if it was enabled. The renderer bumps its `refreshTick` after the
+ * IPC returns, which remounts `<browser-action-list>` to pick up the new
+ * (signed-out) icon state.
  */
 export async function clearExtensionData(
   extensionId: string
@@ -281,20 +311,11 @@ export async function clearExtensionData(
   const entry = findEntry(extensionId)
   if (!entry) return null
 
-  const wasEnabled = entry.enabled
-
-  if (wasEnabled) {
-    await setExtensionEnabled(extensionId, false)
-  } else {
-    extensionsManager.unloadEverywhere(extensionId)
-  }
-
+  extensionsManager.unloadEverywhere(extensionId)
   await wipeExtensionData(extensionId)
+  if (entry.enabled) await extensionsManager.reconcileEntry(entry)
 
-  if (wasEnabled) {
-    await setExtensionEnabled(extensionId, true)
-  }
-  return findEntry(extensionId)
+  return entry
 }
 
 /** Fully uninstall: unload, wipe data, delete files, remove from registry. */
@@ -310,7 +331,9 @@ export async function removeExtension(extensionId: string): Promise<void> {
   if (entry && entry.source !== 'unpacked') {
     const installRoot = join(extensionsDir(), extensionId)
     if (existsSync(installRoot)) {
-      await rm(installRoot, { recursive: true, force: true }).catch(() => {})
+      await rm(installRoot, { recursive: true, force: true }).catch((err) =>
+        console.warn(`[extensions] failed to remove install dir ${installRoot}:`, err)
+      )
     }
   }
 }
@@ -406,8 +429,8 @@ async function wipeExtensionData(extensionId: string): Promise<void> {
     try {
       // flushStorageData is fire-and-forget; not a Promise.
       session.flushStorageData()
-    } catch {
-      // best effort
+    } catch (err) {
+      console.warn(`[extensions] flushStorageData failed for ${extensionId}:`, err)
     }
   }
 

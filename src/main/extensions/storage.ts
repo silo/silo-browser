@@ -13,16 +13,22 @@ const EXTENSION_KEYED_DIRS = [
   'Managed Extension Settings'
 ] as const
 
-// Directories whose *entries* contain the extension id in their name.
-const EXTENSION_PREFIXED_DIRS = [
-  // IndexedDB files look like `chrome-extension_<id>_0.indexeddb.leveldb`.
-  { dir: 'IndexedDB', prefix: (id: string) => `chrome-extension_${id}_` },
-  // The rest just embed the id somewhere in the entry name.
-  { dir: 'Service Worker/Database', prefix: (id: string) => id },
-  { dir: 'Service Worker/ScriptCache', prefix: (id: string) => id },
-  { dir: 'File System', prefix: (id: string) => id },
-  { dir: 'Storage', prefix: (id: string) => id },
-  { dir: 'blob_storage', prefix: (id: string) => id }
+// Directories whose *entries* are keyed by extension id.
+//
+// `mode`:
+//   'prefix' — entry name starts with the prefix (strict, IndexedDB uses a
+//              `chrome-extension_<id>_` template so it can't false-positive).
+//   'embed'  — extension id appears somewhere in the entry name (Service
+//              Worker / File System / blob storage paths don't guarantee a
+//              leading id; a 32-char hex id is unique enough across these
+//              Chromium-owned trees that an `includes` match is safe).
+const EXTENSION_KEYED_ENTRY_DIRS = [
+  { dir: 'IndexedDB', prefix: (id: string) => `chrome-extension_${id}_`, mode: 'prefix' },
+  { dir: 'Service Worker/Database', prefix: (id: string) => id, mode: 'embed' },
+  { dir: 'Service Worker/ScriptCache', prefix: (id: string) => id, mode: 'embed' },
+  { dir: 'File System', prefix: (id: string) => id, mode: 'embed' },
+  { dir: 'Storage', prefix: (id: string) => id, mode: 'embed' },
+  { dir: 'blob_storage', prefix: (id: string) => id, mode: 'embed' }
 ] as const
 
 /**
@@ -64,15 +70,14 @@ export async function deleteExtensionDataOnDisk(
       await removeIfExists(join(root, subdir, extensionId))
     }
 
-    for (const { dir, prefix } of EXTENSION_PREFIXED_DIRS) {
+    for (const { dir, prefix, mode } of EXTENSION_KEYED_ENTRY_DIRS) {
       const dirPath = join(root, dir)
       if (!existsSync(dirPath)) continue
       const entries = await readdir(dirPath).catch(() => [] as string[])
       const pfx = prefix(extensionId)
       for (const entry of entries) {
-        if (entry.startsWith(pfx) || entry.includes(extensionId)) {
-          await removeIfExists(join(dirPath, entry))
-        }
+        const matches = mode === 'prefix' ? entry.startsWith(pfx) : entry.includes(pfx)
+        if (matches) await removeIfExists(join(dirPath, entry))
       }
     }
   }
@@ -80,5 +85,7 @@ export async function deleteExtensionDataOnDisk(
 
 async function removeIfExists(path: string): Promise<void> {
   if (!existsSync(path)) return
-  await rm(path, { recursive: true, force: true }).catch(() => {})
+  await rm(path, { recursive: true, force: true }).catch((err) =>
+    console.warn(`[extensions] failed to remove ${path}:`, err)
+  )
 }

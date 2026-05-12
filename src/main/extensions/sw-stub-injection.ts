@@ -1,6 +1,7 @@
 import { existsSync } from 'fs'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, rename, writeFile } from 'fs/promises'
 import { join } from 'path'
+import type { ChromeManifest } from './compatibility'
 
 /**
  * Prepend chrome.* stub definitions to an extension's service worker script
@@ -37,8 +38,17 @@ const MARKER = '/* === SILO COMPAT STUBS — DO NOT REMOVE === */'
  */
 export async function prependCompatStubsToServiceWorker(
   extensionPath: string,
-  manifest: { background?: { service_worker?: string; type?: string } } | null | undefined
+  manifest: ChromeManifest | null | undefined
 ): Promise<boolean> {
+  // Opt-out for A/B testing: re-check whether `electron-chrome-extensions`
+  // ≥ 4.9 + Electron's SW preload realms cover the cases this file patches.
+  // Set `SILO_DISABLE_SW_STUBS=1` in the environment, reinstall the extension
+  // fresh (so it lands on disk without the prepended block), and exercise it.
+  if (process.env.SILO_DISABLE_SW_STUBS === '1') {
+    console.log('[extensions] SW stub injection disabled via SILO_DISABLE_SW_STUBS')
+    return false
+  }
+
   const swRelativePath = manifest?.background?.service_worker
   if (!swRelativePath) return false
 
@@ -62,8 +72,12 @@ export async function prependCompatStubsToServiceWorker(
   if (original.includes(MARKER)) return false
 
   const prefix = `${MARKER}\n${STUB_SOURCE}\n/* === END SILO COMPAT STUBS === */\n`
+  // Write to a sibling temp file and rename — a crash mid-write would
+  // otherwise leave background.js half-overwritten and unrecoverable.
+  const tmpPath = `${swFullPath}.silo-tmp`
   try {
-    await writeFile(swFullPath, prefix + original, 'utf-8')
+    await writeFile(tmpPath, prefix + original, 'utf-8')
+    await rename(tmpPath, swFullPath)
     return true
   } catch (err) {
     console.warn(`[extensions] failed to prepend stubs to ${swFullPath}:`, err)
@@ -111,17 +125,14 @@ const STUB_SOURCE = `
       onStatusChanged: stubEvent()
     };
   }
-  if (!chrome.scripting) {
-    chrome.scripting = {
-      executeScript: asyncReturn([{ result: null }]),
-      insertCSS: asyncNoop,
-      removeCSS: asyncNoop,
-      registerContentScripts: asyncNoop,
-      unregisterContentScripts: asyncNoop,
-      updateContentScripts: asyncNoop,
-      getRegisteredContentScripts: asyncReturn([])
-    };
-  }
+  // chrome.scripting is intentionally NOT stubbed here. The compatibility
+  // table marks it 'partial' — electron-chrome-extensions provides a real
+  // (if limited) polyfill that routes through chrome.tabs.executeScript.
+  // Defining a no-op stub at SW start raced with that polyfill: when our
+  // stub won, chrome.scripting.executeScript silently returned
+  // [{ result: null }] and Bitwarden's v2023+ autofill (which injects the
+  // fill script via chrome.scripting.executeScript) broke with the prompt
+  // appearing but no fill happening.
   if (!chrome.offscreen) {
     chrome.offscreen = {
       createDocument: asyncNoop,

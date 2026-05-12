@@ -45,7 +45,12 @@ const API_SUPPORT: Record<string, ApiSupport> = {
   management: 'supported',
 
   // ── Partial / polyfilled ────────────────────────────────────────────────
-  scripting: 'partial', // falls back to chrome.tabs.executeScript
+  // chrome.scripting is provided by electron-chrome-extensions and routes
+  // through chrome.tabs.executeScript. Do NOT add it to the SW stubs in
+  // sw-stub-injection.ts — a no-op stub races with the polyfill at SW
+  // start and breaks extensions that rely on executeScript (e.g. Bitwarden
+  // autofill).
+  scripting: 'partial',
 
   // ── Stubbed no-op (prevents crash, feature is dead) ─────────────────────
   commands: 'stub',
@@ -93,14 +98,28 @@ const API_LABELS: Record<string, string> = {
   pageCapture: 'Page capture'
 }
 
-export interface ManifestLike {
+/**
+ * Loose shape of an extension's `manifest.json` covering every field Silo
+ * inspects — manifest_version checks, SW startup, compatibility analysis,
+ * description extraction, icon resolution. Loose by design: Chrome manifests
+ * are open-shaped so callers should treat unknown fields permissively.
+ */
+export interface ChromeManifest {
   name?: string
+  description?: string
+  manifest_version?: number
   permissions?: unknown[]
   optional_permissions?: unknown[]
   host_permissions?: unknown[]
   commands?: unknown
   side_panel?: unknown
-  background?: { service_worker?: string }
+  background?: {
+    service_worker?: string
+    type?: string
+  }
+  icons?: Record<string, string>
+  action?: { default_icon?: string | Record<string, string> }
+  browser_action?: { default_icon?: string | Record<string, string> }
 }
 
 export interface CompatibilityReport {
@@ -126,7 +145,7 @@ export interface CompatibilityReport {
  * Host permissions and pure URL patterns are ignored — they're access
  * declarations, not chrome.* APIs.
  */
-export function analyzeManifest(manifest: ManifestLike): CompatibilityReport {
+export function analyzeManifest(manifest: ChromeManifest): CompatibilityReport {
   const declared = new Set<string>()
   for (const list of [manifest.permissions, manifest.optional_permissions]) {
     if (!Array.isArray(list)) continue
