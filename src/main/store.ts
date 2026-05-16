@@ -174,8 +174,13 @@ export async function saveState(partial: Partial<PersistedState>): Promise<void>
     const dir = dirname(storePath)
     await mkdir(dir, { recursive: true })
     const tmp = `${storePath}.tmp-${process.pid}-${++writeCounter}`
-    await writeFile(tmp, JSON.stringify(cachedState, null, 2))
-    await rename(tmp, storePath)
+    try {
+      await writeFile(tmp, JSON.stringify(cachedState, null, 2))
+      await rename(tmp, storePath)
+    } catch (err) {
+      await unlink(tmp).catch(() => {})
+      throw err
+    }
   } catch (err) {
     console.error('Failed to save state:', err)
   }
@@ -203,6 +208,7 @@ export async function setSyncFolderPath(
 
   const previous = syncFolderPath
   syncFolderPath = path
+  warnedInaccessibleFolder = null
   try {
     await saveLocalPrefs()
     // If switching to a folder that already has a config and the user opted in,
@@ -224,6 +230,7 @@ export async function setSyncFolderPath(
     return cachedState
   } catch (err) {
     syncFolderPath = previous
+    warnedInaccessibleFolder = null
     await saveLocalPrefs().catch(() => {})
     throw err
   }
