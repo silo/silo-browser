@@ -115,6 +115,7 @@ export const useUiStore = defineStore('ui', () => {
   const defaultSleepAfterMinutes = ref(0)
   const confirmCloseChildTabs = ref(false)
   const defaultUserAgent = ref('')
+  const syncFolderPath = ref<string | null>(null)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -134,6 +135,18 @@ export const useUiStore = defineStore('ui', () => {
   function setDefaultUserAgent(value: string): void {
     defaultUserAgent.value = value
     window.api.saveDefaultUserAgent(value)
+  }
+
+  async function configureSyncFolder(): Promise<boolean> {
+    const result = await window.api.configureSyncFolder()
+    if (!result) return false
+    syncFolderPath.value = result.folder
+    return true
+  }
+
+  async function clearSyncFolder(): Promise<void> {
+    await window.api.clearSyncFolder()
+    syncFolderPath.value = null
   }
 
   // --- Theme ---
@@ -370,6 +383,11 @@ export const useUiStore = defineStore('ui', () => {
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
+    try {
+      syncFolderPath.value = (await window.api.getSyncFolder?.()) ?? null
+    } catch {
+      syncFolderPath.value = null
+    }
     applyTheme()
   }
 
@@ -419,6 +437,9 @@ export const useUiStore = defineStore('ui', () => {
     setConfirmCloseChildTabs,
     defaultUserAgent,
     setDefaultUserAgent,
+    syncFolderPath,
+    configureSyncFolder,
+    clearSyncFolder,
     permissionRequest,
     showPermissionRequest,
     respondToPermission,

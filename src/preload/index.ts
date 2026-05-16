@@ -31,6 +31,10 @@ const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   exportConfig: (): Promise<string | null> => ipcRenderer.invoke('dialog:export-config'),
   importConfig: (): Promise<unknown | null> => ipcRenderer.invoke('dialog:import-config'),
+  getSyncFolder: (): Promise<string | null> => ipcRenderer.invoke('store:get-sync-folder'),
+  configureSyncFolder: (): Promise<{ folder: string; state: unknown } | null> =>
+    ipcRenderer.invoke('dialog:configure-sync-folder'),
+  clearSyncFolder: (): Promise<unknown> => ipcRenderer.invoke('store:clear-sync-folder'),
   onOpenInNewTab: (callback: (url: string) => void): void => {
     ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
       callback(url)

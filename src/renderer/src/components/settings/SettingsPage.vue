@@ -64,6 +64,19 @@ async function handleExport(): Promise<void> {
   await window.api.exportConfig()
 }
 
+async function handleChooseSyncFolder(): Promise<void> {
+  const changed = await uiStore.configureSyncFolder()
+  if (changed) {
+    await groupsStore.loadFromDisk()
+    await topbarStore.loadFromDisk()
+    await uiStore.loadFromDisk()
+  }
+}
+
+async function handleClearSyncFolder(): Promise<void> {
+  await uiStore.clearSyncFolder()
+}
+
 const mod = isMac ? '\u2318' : 'Ctrl'
 
 const shortcuts: { keys: string; description: string }[] = [
@@ -369,6 +382,56 @@ function onCustomSurfaceColor(event: Event): void {
               </svg>
               <span>Import Configuration</span>
             </button>
+          </div>
+        </div>
+
+        <!-- Sync section -->
+        <div>
+          <h3
+            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
+          >
+            Sync
+          </h3>
+          <div class="space-y-2">
+            <div
+              class="px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded space-y-2"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <span class="block text-sm text-chrome-fg-secondary">Sync folder</span>
+                  <p
+                    v-if="uiStore.syncFolderPath"
+                    class="text-xs text-chrome-fg-faint mt-0.5 truncate"
+                    :title="uiStore.syncFolderPath"
+                  >
+                    {{ uiStore.syncFolderPath }}
+                  </p>
+                  <p v-else class="text-xs text-chrome-fg-faint mt-0.5">
+                    Not set — using local storage
+                  </p>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                  <button
+                    @click="handleChooseSyncFolder"
+                    class="px-3 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-xs text-chrome-fg-secondary hover:border-accent transition-colors"
+                  >
+                    {{ uiStore.syncFolderPath ? 'Change…' : 'Choose Folder…' }}
+                  </button>
+                  <button
+                    v-if="uiStore.syncFolderPath"
+                    @click="handleClearSyncFolder"
+                    class="px-3 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-xs text-chrome-fg-secondary hover:border-accent transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <p class="text-xs text-chrome-fg-faint">
+                Pick a folder inside iCloud Drive, Dropbox, Google Drive, or OneDrive to sync
+                your Silo config across machines. Changes appear on other devices on next app
+                launch. Only one device should edit at a time.
+              </p>
+            </div>
           </div>
         </div>
 

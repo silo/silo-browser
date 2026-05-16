@@ -1,6 +1,6 @@
 import { app } from 'electron'
-import { readFileSync, existsSync } from 'fs'
-import { writeFile, mkdir } from 'fs/promises'
+import { readFileSync, existsSync, statSync } from 'fs'
+import { writeFile, mkdir, rename } from 'fs/promises'
 import { join, dirname } from 'path'
 
 export interface PersistedState {
@@ -23,6 +23,9 @@ const VALID_THEME_MODES = ['dark', 'light', 'system']
 const VALID_ACCENT_COLORS = ['blue', 'green', 'amber', 'red', 'violet', 'pink', 'cyan', 'orange', 'gray']
 const VALID_SURFACE_COLORS = ['neutral', 'charcoal', 'slate', 'navy', 'forest', 'wine', 'plum', 'teal', 'earth']
 
+const CONFIG_FILENAME = 'silo-config.json'
+const LOCAL_PREFS_FILENAME = 'silo-prefs.local.json'
+
 const defaultState: PersistedState = {
   groups: [],
   activeTabId: null,
@@ -40,15 +43,69 @@ const defaultState: PersistedState = {
 }
 
 let cachedState: PersistedState = { ...defaultState }
+let syncFolderPath: string | null = null
+let localPrefsLoaded = false
 
-function getStorePath(): string {
-  return join(app.getPath('userData'), 'silo-config.json')
+function getLocalPrefsPath(): string {
+  return join(app.getPath('userData'), LOCAL_PREFS_FILENAME)
+}
+
+function loadLocalPrefs(): void {
+  if (localPrefsLoaded) return
+  localPrefsLoaded = true
+  try {
+    const path = getLocalPrefsPath()
+    if (!existsSync(path)) return
+    const raw = readFileSync(path, 'utf-8')
+    const parsed = JSON.parse(raw)
+    if (typeof parsed.syncFolderPath === 'string' && parsed.syncFolderPath.length > 0) {
+      syncFolderPath = parsed.syncFolderPath
+    }
+  } catch (err) {
+    console.error('Failed to read local prefs:', err)
+  }
+}
+
+async function saveLocalPrefs(): Promise<void> {
+  const path = getLocalPrefsPath()
+  try {
+    await mkdir(dirname(path), { recursive: true })
+    const tmp = `${path}.tmp`
+    await writeFile(tmp, JSON.stringify({ syncFolderPath }, null, 2))
+    await rename(tmp, path)
+  } catch (err) {
+    console.error('Failed to save local prefs:', err)
+  }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function getConfigPath(): string {
+  loadLocalPrefs()
+  if (syncFolderPath && isDirectory(syncFolderPath)) {
+    return join(syncFolderPath, CONFIG_FILENAME)
+  }
+  if (syncFolderPath) {
+    console.warn(
+      `Silo sync folder not accessible (${syncFolderPath}); falling back to local storage.`
+    )
+  }
+  return join(app.getPath('userData'), CONFIG_FILENAME)
 }
 
 export function loadState(): PersistedState {
-  const storePath = getStorePath()
+  const storePath = getConfigPath()
   try {
-    if (!existsSync(storePath)) return { ...defaultState }
+    if (!existsSync(storePath)) {
+      cachedState = { ...defaultState }
+      return cachedState
+    }
     const raw = readFileSync(storePath, 'utf-8')
     const parsed = JSON.parse(raw)
     const state: PersistedState = {
@@ -98,12 +155,49 @@ export function getCachedState(): PersistedState {
 
 export async function saveState(partial: Partial<PersistedState>): Promise<void> {
   cachedState = { ...cachedState, ...partial }
-  const storePath = getStorePath()
+  const storePath = getConfigPath()
   try {
     const dir = dirname(storePath)
     await mkdir(dir, { recursive: true })
-    await writeFile(storePath, JSON.stringify(cachedState, null, 2))
+    const tmp = `${storePath}.tmp`
+    await writeFile(tmp, JSON.stringify(cachedState, null, 2))
+    await rename(tmp, storePath)
   } catch (err) {
     console.error('Failed to save state:', err)
   }
+}
+
+export function getSyncFolderPath(): string | null {
+  loadLocalPrefs()
+  return syncFolderPath
+}
+
+export function peekSyncFolder(path: string): { valid: boolean; hasExistingConfig: boolean } {
+  if (!isDirectory(path)) return { valid: false, hasExistingConfig: false }
+  return { valid: true, hasExistingConfig: existsSync(join(path, CONFIG_FILENAME)) }
+}
+
+export async function setSyncFolderPath(
+  path: string | null,
+  mode: 'use-existing' | 'overwrite' = 'overwrite'
+): Promise<PersistedState> {
+  loadLocalPrefs()
+
+  if (path !== null && !isDirectory(path)) {
+    throw new Error(`Sync folder is not accessible: ${path}`)
+  }
+
+  // If switching to a folder that already has a config and the user opted in,
+  // adopt that config. Otherwise (overwrite, or no existing file), write the
+  // current cached state to the new location.
+  if (path !== null && mode === 'use-existing' && existsSync(join(path, CONFIG_FILENAME))) {
+    syncFolderPath = path
+    await saveLocalPrefs()
+    return loadState()
+  }
+
+  syncFolderPath = path
+  await saveLocalPrefs()
+  await saveState({})
+  return cachedState
 }
