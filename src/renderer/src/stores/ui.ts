@@ -384,7 +384,7 @@ export const useUiStore = defineStore('ui', () => {
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
     try {
-      syncFolderPath.value = (await window.api.getSyncFolder?.()) ?? null
+      syncFolderPath.value = (await window.api.getSyncFolder()) ?? null
     } catch {
       syncFolderPath.value = null
     }

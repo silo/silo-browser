@@ -86,6 +86,14 @@ function isDirectory(path: string): boolean {
   }
 }
 
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
+}
+
 function getConfigPath(): string {
   loadLocalPrefs()
   if (syncFolderPath && isDirectory(syncFolderPath)) {
@@ -174,7 +182,7 @@ export function getSyncFolderPath(): string | null {
 
 export function peekSyncFolder(path: string): { valid: boolean; hasExistingConfig: boolean } {
   if (!isDirectory(path)) return { valid: false, hasExistingConfig: false }
-  return { valid: true, hasExistingConfig: existsSync(join(path, CONFIG_FILENAME)) }
+  return { valid: true, hasExistingConfig: isFile(join(path, CONFIG_FILENAME)) }
 }
 
 export async function setSyncFolderPath(
@@ -190,7 +198,7 @@ export async function setSyncFolderPath(
   // If switching to a folder that already has a config and the user opted in,
   // adopt that config. Otherwise (overwrite, or no existing file), write the
   // current cached state to the new location.
-  if (path !== null && mode === 'use-existing' && existsSync(join(path, CONFIG_FILENAME))) {
+  if (path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))) {
     syncFolderPath = path
     await saveLocalPrefs()
     return loadState()
