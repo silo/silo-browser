@@ -92,10 +92,21 @@ const handledSessions = new WeakSet<Electron.Session>()
 const grantedPermissions = new Set<string>()
 
 function loadGrantedPermissions(): void {
+  grantedPermissions.clear()
   const state = getCachedState()
   for (const entry of state.grantedPermissions) {
     grantedPermissions.add(entry)
   }
+}
+
+// Re-syncs main-process caches that derive from PersistedState. Call after
+// the on-disk config is replaced wholesale (e.g. after adopting a sync
+// folder's existing config), since these caches are otherwise only populated
+// at startup.
+export function refreshCachesFromState(): void {
+  const state = getCachedState()
+  nativeTheme.themeSource = state.themeMode as 'dark' | 'light' | 'system'
+  loadGrantedPermissions()
 }
 
 function persistGrantedPermission(key: string): void {

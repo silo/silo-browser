@@ -8,6 +8,7 @@ import {
   peekSyncFolder,
   setSyncFolderPath
 } from './store'
+import { refreshCachesFromState } from './index'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
 
 export function registerIpcHandlers(): void {
@@ -188,6 +189,7 @@ export function registerIpcHandlers(): void {
 
     try {
       const state = await setSyncFolderPath(folder, mode)
+      refreshCachesFromState()
       return { folder, state }
     } catch (err) {
       await dialog.showMessageBox(win, {
