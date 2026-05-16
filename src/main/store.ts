@@ -94,15 +94,19 @@ function isFile(path: string): boolean {
   }
 }
 
+let warnedInaccessibleFolder: string | null = null
+
 function getConfigPath(): string {
   loadLocalPrefs()
   if (syncFolderPath && isDirectory(syncFolderPath)) {
+    warnedInaccessibleFolder = null
     return join(syncFolderPath, CONFIG_FILENAME)
   }
-  if (syncFolderPath) {
+  if (syncFolderPath && warnedInaccessibleFolder !== syncFolderPath) {
     console.warn(
       `Silo sync folder not accessible (${syncFolderPath}); falling back to local storage.`
     )
+    warnedInaccessibleFolder = syncFolderPath
   }
   return join(app.getPath('userData'), CONFIG_FILENAME)
 }
