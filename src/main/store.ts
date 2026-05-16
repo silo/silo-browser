@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { readFileSync, existsSync, statSync } from 'fs'
-import { writeFile, mkdir, rename } from 'fs/promises'
+import { writeFile, mkdir, rename, unlink } from 'fs/promises'
 import { join, dirname } from 'path'
 
 export interface PersistedState {
@@ -69,13 +69,14 @@ function loadLocalPrefs(): void {
 
 async function saveLocalPrefs(): Promise<void> {
   const path = getLocalPrefsPath()
+  await mkdir(dirname(path), { recursive: true })
+  const tmp = `${path}.tmp-${process.pid}-${++writeCounter}`
   try {
-    await mkdir(dirname(path), { recursive: true })
-    const tmp = `${path}.tmp-${process.pid}-${++writeCounter}`
     await writeFile(tmp, JSON.stringify({ syncFolderPath }, null, 2))
     await rename(tmp, path)
   } catch (err) {
-    console.error('Failed to save local prefs:', err)
+    await unlink(tmp).catch(() => {})
+    throw err
   }
 }
 
@@ -200,17 +201,30 @@ export async function setSyncFolderPath(
     throw new Error(`Sync folder is not accessible: ${path}`)
   }
 
-  // If switching to a folder that already has a config and the user opted in,
-  // adopt that config. Otherwise (overwrite, or no existing file), write the
-  // current cached state to the new location.
-  if (path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))) {
-    syncFolderPath = path
-    await saveLocalPrefs()
-    return loadState()
-  }
-
+  const previous = syncFolderPath
   syncFolderPath = path
-  await saveLocalPrefs()
-  await saveState({})
-  return cachedState
+  try {
+    await saveLocalPrefs()
+    // If switching to a folder that already has a config and the user opted in,
+    // adopt it. Otherwise write the current cached state to the new location so
+    // the file exists and any failure (e.g. read-only folder) surfaces here.
+    if (path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))) {
+      return loadState()
+    }
+    const storePath = getConfigPath()
+    await mkdir(dirname(storePath), { recursive: true })
+    const tmp = `${storePath}.tmp-${process.pid}-${++writeCounter}`
+    try {
+      await writeFile(tmp, JSON.stringify(cachedState, null, 2))
+      await rename(tmp, storePath)
+    } catch (err) {
+      await unlink(tmp).catch(() => {})
+      throw err
+    }
+    return cachedState
+  } catch (err) {
+    syncFolderPath = previous
+    await saveLocalPrefs().catch(() => {})
+    throw err
+  }
 }
