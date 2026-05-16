@@ -45,6 +45,7 @@ const defaultState: PersistedState = {
 let cachedState: PersistedState = { ...defaultState }
 let syncFolderPath: string | null = null
 let localPrefsLoaded = false
+let writeCounter = 0
 
 function getLocalPrefsPath(): string {
   return join(app.getPath('userData'), LOCAL_PREFS_FILENAME)
@@ -70,7 +71,7 @@ async function saveLocalPrefs(): Promise<void> {
   const path = getLocalPrefsPath()
   try {
     await mkdir(dirname(path), { recursive: true })
-    const tmp = `${path}.tmp`
+    const tmp = `${path}.tmp-${process.pid}-${++writeCounter}`
     await writeFile(tmp, JSON.stringify({ syncFolderPath }, null, 2))
     await rename(tmp, path)
   } catch (err) {
@@ -171,7 +172,7 @@ export async function saveState(partial: Partial<PersistedState>): Promise<void>
   try {
     const dir = dirname(storePath)
     await mkdir(dir, { recursive: true })
-    const tmp = `${storePath}.tmp`
+    const tmp = `${storePath}.tmp-${process.pid}-${++writeCounter}`
     await writeFile(tmp, JSON.stringify(cachedState, null, 2))
     await rename(tmp, storePath)
   } catch (err) {
