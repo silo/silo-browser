@@ -222,11 +222,21 @@ export async function setSyncFolderPath(
     } catch {
       throw new Error(`Existing config in ${path} is not valid JSON; refusing to adopt.`)
     }
-  } else if (path !== null) {
-    // Overwrite mode, or no existing file: write current state to the new
-    // location now. A failure here (read-only folder, disk full) surfaces
-    // before we commit the new pointer.
-    await atomicWriteJson(join(path, CONFIG_FILENAME), cachedState)
+  } else {
+    // Write current cachedState to the future config location BEFORE committing
+    // the pointer change. This covers three cases:
+    //   - Overwrite onto an existing sync folder: replaces the cloud file.
+    //   - Setting a new sync folder: seeds the file.
+    //   - Clearing sync (path === null): persists current state to userData so
+    //     a quit immediately after Clear doesn't lose the session's data to a
+    //     stale local config.
+    // A failure here (read-only folder, disk full) surfaces before any in-memory
+    // mutation, so the previous setup stays intact.
+    const futureConfigPath =
+      path !== null
+        ? join(path, CONFIG_FILENAME)
+        : join(app.getPath('userData'), CONFIG_FILENAME)
+    await atomicWriteJson(futureConfigPath, cachedState)
   }
 
   // Persist the new pointer atomically, then commit the in-memory mutation.
