@@ -4,7 +4,7 @@ import { writeFile } from 'fs/promises'
 import {
   getCachedState,
   saveState,
-  getSyncFolderPath,
+  getSyncFolderInfo,
   peekSyncFolder,
   setSyncFolderPath
 } from './store'
@@ -145,7 +145,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('store:get-sync-folder', () => {
-    return getSyncFolderPath()
+    return getSyncFolderInfo()
   })
 
   ipcMain.handle('dialog:configure-sync-folder', async () => {

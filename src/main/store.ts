@@ -188,9 +188,10 @@ export async function saveState(partial: Partial<PersistedState>): Promise<void>
   return task
 }
 
-export function getSyncFolderPath(): string | null {
+export function getSyncFolderInfo(): { path: string | null; accessible: boolean } {
   loadLocalPrefs()
-  return syncFolderPath
+  if (!syncFolderPath) return { path: null, accessible: false }
+  return { path: syncFolderPath, accessible: isDirectory(syncFolderPath) }
 }
 
 export function peekSyncFolder(path: string): { valid: boolean; hasExistingConfig: boolean } {

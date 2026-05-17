@@ -406,7 +406,13 @@ function onCustomSurfaceColor(event: Event): void {
                   >
                     {{ uiStore.syncFolderPath }}
                   </p>
-                  <p v-else class="text-xs text-chrome-fg-faint mt-0.5">
+                  <p
+                    v-if="uiStore.syncFolderPath && !uiStore.syncFolderAccessible"
+                    class="text-xs text-semantic-warning mt-0.5"
+                  >
+                    Folder unavailable — writing to local storage until it returns
+                  </p>
+                  <p v-if="!uiStore.syncFolderPath" class="text-xs text-chrome-fg-faint mt-0.5">
                     Not set — using local storage
                   </p>
                 </div>

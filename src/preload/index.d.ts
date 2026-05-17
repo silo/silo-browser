@@ -20,7 +20,7 @@ export interface SiloApi {
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>
   importConfig: () => Promise<unknown | null>
-  getSyncFolder: () => Promise<string | null>
+  getSyncFolder: () => Promise<{ path: string | null; accessible: boolean }>
   configureSyncFolder: () => Promise<{ folder: string; state: AppState } | null>
   clearSyncFolder: () => Promise<AppState | null>
   onOpenInNewTab: (callback: (url: string) => void) => void

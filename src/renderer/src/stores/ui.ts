@@ -116,6 +116,7 @@ export const useUiStore = defineStore('ui', () => {
   const confirmCloseChildTabs = ref(false)
   const defaultUserAgent = ref('')
   const syncFolderPath = ref<string | null>(null)
+  const syncFolderAccessible = ref(false)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -141,6 +142,7 @@ export const useUiStore = defineStore('ui', () => {
     const result = await window.api.configureSyncFolder()
     if (!result) return false
     syncFolderPath.value = result.folder
+    syncFolderAccessible.value = true
     return true
   }
 
@@ -150,6 +152,7 @@ export const useUiStore = defineStore('ui', () => {
     // so it reflects the actual (unchanged) sync configuration.
     if (result !== null) {
       syncFolderPath.value = null
+      syncFolderAccessible.value = false
     }
   }
 
@@ -388,9 +391,12 @@ export const useUiStore = defineStore('ui', () => {
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
     try {
-      syncFolderPath.value = (await window.api.getSyncFolder()) ?? null
+      const info = await window.api.getSyncFolder()
+      syncFolderPath.value = info.path
+      syncFolderAccessible.value = info.accessible
     } catch {
       syncFolderPath.value = null
+      syncFolderAccessible.value = false
     }
     applyTheme()
   }
@@ -442,6 +448,7 @@ export const useUiStore = defineStore('ui', () => {
     defaultUserAgent,
     setDefaultUserAgent,
     syncFolderPath,
+    syncFolderAccessible,
     configureSyncFolder,
     clearSyncFolder,
     permissionRequest,
