@@ -163,8 +163,10 @@ export function loadState(): PersistedState {
     }
     cachedState = { ...state }
     return state
-  } catch {
-    return { ...defaultState }
+  } catch (err) {
+    console.error('Failed to load state; falling back to defaults:', err)
+    cachedState = { ...defaultState }
+    return cachedState
   }
 }
 
