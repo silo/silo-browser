@@ -8,7 +8,7 @@ import {
   peekSyncFolder,
   setSyncFolderPath
 } from './store'
-import { refreshCachesFromState } from './index'
+import { refreshCachesFromState } from './runtime-state'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
 
 export function registerIpcHandlers(): void {

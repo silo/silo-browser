@@ -14,7 +14,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { initAutoUpdater } from './updater'
-import { getCachedState, loadState, saveState } from './store'
+import { getCachedState, loadState } from './store'
+import { grantedPermissions, loadGrantedPermissions, persistGrantedPermission } from './runtime-state'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
@@ -87,32 +88,6 @@ const autoGrantPermissions = new Set([
 
 // Track sessions that already have permission handlers
 const handledSessions = new WeakSet<Electron.Session>()
-
-// Global set of user-granted permissions ("origin::permission"), persisted to disk
-const grantedPermissions = new Set<string>()
-
-function loadGrantedPermissions(): void {
-  grantedPermissions.clear()
-  const state = getCachedState()
-  for (const entry of state.grantedPermissions) {
-    grantedPermissions.add(entry)
-  }
-}
-
-// Re-syncs main-process caches that derive from PersistedState. Call after
-// the on-disk config is replaced wholesale (e.g. after adopting a sync
-// folder's existing config), since these caches are otherwise only populated
-// at startup.
-export function refreshCachesFromState(): void {
-  const state = getCachedState()
-  nativeTheme.themeSource = state.themeMode as 'dark' | 'light' | 'system'
-  loadGrantedPermissions()
-}
-
-function persistGrantedPermission(key: string): void {
-  grantedPermissions.add(key)
-  saveState({ grantedPermissions: [...grantedPermissions] })
-}
 
 // Pending permission request callbacks waiting for user response
 let permissionRequestId = 0

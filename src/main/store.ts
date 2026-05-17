@@ -46,6 +46,7 @@ let cachedState: PersistedState = { ...defaultState }
 let syncFolderPath: string | null = null
 let localPrefsLoaded = false
 let writeCounter = 0
+let writeChain: Promise<void> = Promise.resolve()
 
 function getLocalPrefsPath(): string {
   return join(app.getPath('userData'), LOCAL_PREFS_FILENAME)
@@ -67,13 +68,17 @@ function loadLocalPrefs(): void {
   }
 }
 
-async function saveLocalPrefs(): Promise<void> {
-  const path = getLocalPrefsPath()
-  await mkdir(dirname(path), { recursive: true })
-  const tmp = `${path}.tmp-${process.pid}-${++writeCounter}`
+// Atomic JSON write: write to a unique temp file, then rename. The pid+counter
+// suffix avoids two concurrent writes (multiple Silo instances on the same sync
+// folder, or in-process races not covered by the writeChain) clobbering the
+// same temp file. On failure, the temp file is cleaned up and the error is
+// rethrown so callers can decide whether to surface it.
+async function atomicWriteJson(targetPath: string, data: unknown): Promise<void> {
+  await mkdir(dirname(targetPath), { recursive: true })
+  const tmp = `${targetPath}.tmp-${process.pid}-${++writeCounter}`
   try {
-    await writeFile(tmp, JSON.stringify({ syncFolderPath }, null, 2))
-    await rename(tmp, path)
+    await writeFile(tmp, JSON.stringify(data, null, 2))
+    await rename(tmp, targetPath)
   } catch (err) {
     await unlink(tmp).catch(() => {})
     throw err
@@ -169,21 +174,18 @@ export function getCachedState(): PersistedState {
 
 export async function saveState(partial: Partial<PersistedState>): Promise<void> {
   cachedState = { ...cachedState, ...partial }
-  const storePath = getConfigPath()
-  try {
-    const dir = dirname(storePath)
-    await mkdir(dir, { recursive: true })
-    const tmp = `${storePath}.tmp-${process.pid}-${++writeCounter}`
+  // Serialize disk writes so a slower older write can't rename-clobber a faster
+  // newer one on disk. Each queued task reads cachedState fresh at execution
+  // time, so the on-disk file always converges to the latest cachedState.
+  const task = writeChain.then(async () => {
     try {
-      await writeFile(tmp, JSON.stringify(cachedState, null, 2))
-      await rename(tmp, storePath)
+      await atomicWriteJson(getConfigPath(), cachedState)
     } catch (err) {
-      await unlink(tmp).catch(() => {})
-      throw err
+      console.error('Failed to save state:', err)
     }
-  } catch (err) {
-    console.error('Failed to save state:', err)
-  }
+  })
+  writeChain = task
+  return task
 }
 
 export function getSyncFolderPath(): string | null {
@@ -206,32 +208,33 @@ export async function setSyncFolderPath(
     throw new Error(`Sync folder is not accessible: ${path}`)
   }
 
-  const previous = syncFolderPath
+  // Do all the risky work first, BEFORE mutating any module state. If any step
+  // throws, we exit here and nothing has changed — no rollback needed.
+  const adopting =
+    path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))
+
+  if (adopting) {
+    // Validate the existing file is parseable. Without this, loadState()'s catch
+    // would silently return defaults while leaving cachedState untouched —
+    // adopting "succeeds" but the renderer keeps showing the previous data.
+    try {
+      JSON.parse(readFileSync(join(path!, CONFIG_FILENAME), 'utf-8'))
+    } catch {
+      throw new Error(`Existing config in ${path} is not valid JSON; refusing to adopt.`)
+    }
+  } else if (path !== null) {
+    // Overwrite mode, or no existing file: write current state to the new
+    // location now. A failure here (read-only folder, disk full) surfaces
+    // before we commit the new pointer.
+    await atomicWriteJson(join(path, CONFIG_FILENAME), cachedState)
+  }
+
+  // Persist the new pointer atomically, then commit the in-memory mutation.
+  // Writing local prefs last means a failure leaves the previous pointer
+  // intact both on disk and in memory.
+  await atomicWriteJson(getLocalPrefsPath(), { syncFolderPath: path })
   syncFolderPath = path
   warnedInaccessibleFolder = null
-  try {
-    await saveLocalPrefs()
-    // If switching to a folder that already has a config and the user opted in,
-    // adopt it. Otherwise write the current cached state to the new location so
-    // the file exists and any failure (e.g. read-only folder) surfaces here.
-    if (path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))) {
-      return loadState()
-    }
-    const storePath = getConfigPath()
-    await mkdir(dirname(storePath), { recursive: true })
-    const tmp = `${storePath}.tmp-${process.pid}-${++writeCounter}`
-    try {
-      await writeFile(tmp, JSON.stringify(cachedState, null, 2))
-      await rename(tmp, storePath)
-    } catch (err) {
-      await unlink(tmp).catch(() => {})
-      throw err
-    }
-    return cachedState
-  } catch (err) {
-    syncFolderPath = previous
-    warnedInaccessibleFolder = null
-    await saveLocalPrefs().catch(() => {})
-    throw err
-  }
+
+  return adopting ? loadState() : cachedState
 }
