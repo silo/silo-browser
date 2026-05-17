@@ -37,7 +37,8 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 ## Key Files
 - `electron.vite.config.ts` — Unified Vite config (main + preload + renderer)
 - `src/main/index.ts` — Main process entry, creates BrowserWindow with webviewTag: true
-- `src/main/store.ts` — JSON file persistence for app state (groups, sidebar)
+- `src/main/store.ts` — JSON file persistence for app state (groups, sidebar). Resolves config path from optional sync folder; all writes go through `atomicWriteJson` (write to unique tmp + rename) and `saveState` serializes through a promise chain so concurrent writes can't rename-clobber each other.
+- `src/main/runtime-state.ts` — Main-process side caches that derive from `PersistedState` (granted permissions Set, `nativeTheme.themeSource`). `refreshCachesFromState()` is called after `setSyncFolderPath` to re-sync these when the on-disk config is replaced wholesale.
 - `src/main/ipc-handlers.ts` — All IPC handler registrations (store, shell, dialog)
 - `src/preload/index.ts` — contextBridge API (window.api)
 - `src/preload/index.d.ts` — TypeScript declarations for SiloApi
@@ -82,6 +83,9 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `shell:open-external` — Opens URL in system browser
 - `dialog:export-config` — Export config to JSON file
 - `dialog:import-config` — Import config from JSON file
+- `store:get-sync-folder` — Returns `{ path, accessible }` for the configured sync folder
+- `dialog:configure-sync-folder` — Picks a folder, optionally adopts its existing config or overwrites it, and refreshes main-process caches
+- `store:clear-sync-folder` — Stops syncing and writes current state back to local userData
 
 ## Conventions
 - Component names: `TheSidebar.vue` for singletons, `SidebarGroup.vue` for reusable
@@ -106,6 +110,9 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `target=_blank` / `window.open()` links are handled via `setWindowOpenHandler` in main process (not deprecated `new-window` event)
 - `openLinksInNewTab` setting (persisted) controls whether _blank links open as topbar tabs or in the system browser
 - `app-drag` and `app-no-drag` CSS classes control macOS window dragging regions
+- Cloud sync uses a two-file split: `silo-prefs.local.json` (always at userData, holds the sync folder pointer; never synced) and `silo-config.json` (at the sync folder if set, else userData). The pointer can't live inside the synced file because machines have different paths
+- When the sync folder is set but currently inaccessible (drive unmounted, etc.), saves fall back to userData and the UI shows a "currently offline" warning. The setting itself is preserved so sync resumes automatically when the folder reappears
+- `setSyncFolderPath` does all risky work (parse-validation for "use existing", or writing current state to the new location) BEFORE mutating module state — so a failure leaves the previous configuration intact with no rollback needed
 
 ## Remaining Features (not yet implemented)
 - Split view (two tabs side by side)
