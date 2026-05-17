@@ -145,8 +145,12 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   async function clearSyncFolder(): Promise<void> {
-    await window.api.clearSyncFolder()
-    syncFolderPath.value = null
+    const result = await window.api.clearSyncFolder()
+    // null = main process surfaced an error dialog; leave UI state untouched
+    // so it reflects the actual (unchanged) sync configuration.
+    if (result !== null) {
+      syncFolderPath.value = null
+    }
   }
 
   // --- Theme ---

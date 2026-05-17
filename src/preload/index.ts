@@ -35,7 +35,7 @@ const api = {
   getSyncFolder: (): Promise<string | null> => ipcRenderer.invoke('store:get-sync-folder'),
   configureSyncFolder: (): Promise<{ folder: string; state: AppState } | null> =>
     ipcRenderer.invoke('dialog:configure-sync-folder'),
-  clearSyncFolder: (): Promise<AppState> => ipcRenderer.invoke('store:clear-sync-folder'),
+  clearSyncFolder: (): Promise<AppState | null> => ipcRenderer.invoke('store:clear-sync-folder'),
   onOpenInNewTab: (callback: (url: string) => void): void => {
     ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
       callback(url)

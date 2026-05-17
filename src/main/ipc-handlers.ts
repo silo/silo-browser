@@ -202,7 +202,18 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('store:clear-sync-folder', async () => {
-    const state = await setSyncFolderPath(null)
-    return state
+    try {
+      return await setSyncFolderPath(null)
+    } catch (err) {
+      const win = BrowserWindow.getFocusedWindow()
+      if (win) {
+        await dialog.showMessageBox(win, {
+          type: 'error',
+          message: 'Failed to clear sync folder.',
+          detail: err instanceof Error ? err.message : String(err)
+        })
+      }
+      return null
+    }
   })
 }
