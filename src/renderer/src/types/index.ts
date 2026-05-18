@@ -56,6 +56,7 @@ export interface AppState {
   accentColor: AccentColor
   surfaceColor: string // SurfaceColor preset name or custom hex (e.g. '#1a2332')
   defaultSleepAfterMinutes: number
+  lastSaved: number // Unix ms timestamp of the last persisted save; 0 = never
 }
 
 export interface ContextMenuItem {

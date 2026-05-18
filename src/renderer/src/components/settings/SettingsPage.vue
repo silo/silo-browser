@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
@@ -37,8 +37,45 @@ const surfacePresets: { name: SurfaceColor; swatch: string }[] = [
   { name: 'plum', swatch: '#a855f7' }
 ]
 
+// Tick once a minute so "X min ago" stays roughly current while the page is open.
+const now = ref(Date.now())
+let nowTicker: number | null = null
+
 onMounted(async () => {
   appVersion.value = await window.api.getAppVersion()
+  await uiStore.refreshLastSaved()
+  nowTicker = window.setInterval(() => {
+    now.value = Date.now()
+  }, 60_000)
+})
+
+onUnmounted(() => {
+  if (nowTicker !== null) {
+    window.clearInterval(nowTicker)
+    nowTicker = null
+  }
+})
+
+const lastSavedDisplay = computed<string>(() => {
+  const ts = uiStore.lastSaved
+  if (!ts) return 'Never'
+  const diff = now.value - ts
+  if (diff < 0 || diff < 60_000) return 'Just now'
+  if (diff < 3_600_000) {
+    const m = Math.floor(diff / 60_000)
+    return `${m} minute${m === 1 ? '' : 's'} ago`
+  }
+  if (diff < 86_400_000) {
+    const h = Math.floor(diff / 3_600_000)
+    return `${h} hour${h === 1 ? '' : 's'} ago`
+  }
+  const d = Math.floor(diff / 86_400_000)
+  return `${d} day${d === 1 ? '' : 's'} ago`
+})
+
+const lastSavedAbsolute = computed<string>(() => {
+  if (!uiStore.lastSaved) return ''
+  return new Date(uiStore.lastSaved).toLocaleString()
 })
 
 function handleCheckForUpdates(): void {
@@ -436,6 +473,9 @@ function onCustomSurfaceColor(event: Event): void {
                 Pick a folder inside iCloud Drive, Dropbox, Google Drive, or OneDrive to sync
                 your Silo config across machines. Changes appear on other devices on next app
                 launch. Only one device should edit at a time.
+              </p>
+              <p class="text-xs text-chrome-fg-faint" :title="lastSavedAbsolute">
+                Last saved: {{ lastSavedDisplay }}
               </p>
             </div>
           </div>

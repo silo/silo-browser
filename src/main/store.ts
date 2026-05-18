@@ -17,6 +17,11 @@ export interface PersistedState {
   defaultSleepAfterMinutes: number
   confirmCloseChildTabs: boolean
   defaultUserAgent: string
+  // Unix ms timestamp set on every saveState. 0 = never saved.
+  // Stored in the config so a future "pick-newer between sync folder and
+  // userData" logic can compare candidates honestly across devices, independent
+  // of filesystem mtime (which cloud clients re-stamp on download).
+  lastSaved: number
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
@@ -39,7 +44,8 @@ const defaultState: PersistedState = {
   grantedPermissions: [],
   defaultSleepAfterMinutes: 0,
   confirmCloseChildTabs: false,
-  defaultUserAgent: ''
+  defaultUserAgent: '',
+  lastSaved: 0
 }
 
 let cachedState: PersistedState = { ...defaultState }
@@ -159,7 +165,9 @@ export function loadState(): PersistedState {
       confirmCloseChildTabs:
         typeof parsed.confirmCloseChildTabs === 'boolean' ? parsed.confirmCloseChildTabs : false,
       defaultUserAgent:
-        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : ''
+        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : '',
+      lastSaved:
+        typeof parsed.lastSaved === 'number' && parsed.lastSaved >= 0 ? parsed.lastSaved : 0
     }
     cachedState = { ...state }
     return state
@@ -175,7 +183,7 @@ export function getCachedState(): PersistedState {
 }
 
 export async function saveState(partial: Partial<PersistedState>): Promise<void> {
-  cachedState = { ...cachedState, ...partial }
+  cachedState = { ...cachedState, ...partial, lastSaved: Date.now() }
   // Serialize disk writes so a slower older write can't rename-clobber a faster
   // newer one on disk. Each queued task reads cachedState fresh at execution
   // time, so the on-disk file always converges to the latest cachedState.
@@ -235,6 +243,7 @@ export async function setSyncFolderPath(
     //     stale local config.
     // A failure here (read-only folder, disk full) surfaces before any in-memory
     // mutation, so the previous setup stays intact.
+    cachedState = { ...cachedState, lastSaved: Date.now() }
     const futureConfigPath =
       path !== null
         ? join(path, CONFIG_FILENAME)

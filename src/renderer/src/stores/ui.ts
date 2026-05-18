@@ -117,6 +117,7 @@ export const useUiStore = defineStore('ui', () => {
   const defaultUserAgent = ref('')
   const syncFolderPath = ref<string | null>(null)
   const syncFolderAccessible = ref(false)
+  const lastSaved = ref<number>(0)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -136,6 +137,11 @@ export const useUiStore = defineStore('ui', () => {
   function setDefaultUserAgent(value: string): void {
     defaultUserAgent.value = value
     window.api.saveDefaultUserAgent(value)
+  }
+
+  async function refreshLastSaved(): Promise<void> {
+    const state = await window.api.getState()
+    lastSaved.value = state.lastSaved ?? 0
   }
 
   async function configureSyncFolder(): Promise<boolean> {
@@ -387,6 +393,7 @@ export const useUiStore = defineStore('ui', () => {
     defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
     confirmCloseChildTabs.value = (state.confirmCloseChildTabs as boolean | undefined) ?? false
     defaultUserAgent.value = (state.defaultUserAgent as string | undefined) ?? ''
+    lastSaved.value = (state.lastSaved as number | undefined) ?? 0
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
@@ -449,6 +456,8 @@ export const useUiStore = defineStore('ui', () => {
     setDefaultUserAgent,
     syncFolderPath,
     syncFolderAccessible,
+    lastSaved,
+    refreshLastSaved,
     configureSyncFolder,
     clearSyncFolder,
     permissionRequest,
