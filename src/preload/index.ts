@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { join } from 'path'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { AppState } from '../renderer/src/types'
 
 const api = {
   platform: process.platform as string,
@@ -31,6 +32,11 @@ const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   exportConfig: (): Promise<string | null> => ipcRenderer.invoke('dialog:export-config'),
   importConfig: (): Promise<unknown | null> => ipcRenderer.invoke('dialog:import-config'),
+  getSyncFolder: (): Promise<{ path: string | null; accessible: boolean }> =>
+    ipcRenderer.invoke('store:get-sync-folder'),
+  configureSyncFolder: (): Promise<{ folder: string; state: AppState } | null> =>
+    ipcRenderer.invoke('dialog:configure-sync-folder'),
+  clearSyncFolder: (): Promise<AppState | null> => ipcRenderer.invoke('store:clear-sync-folder'),
   onOpenInNewTab: (callback: (url: string) => void): void => {
     ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
       callback(url)

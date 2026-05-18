@@ -32,6 +32,7 @@
   --semantic-danger: #ef4444;
   --semantic-danger-soft: #f87171;
   --semantic-success: #4ade80;
+  --semantic-warning: #fbbf24;
 
   --overlay: rgba(0, 0, 0, 0.5);
 
@@ -74,6 +75,7 @@
   --semantic-danger: #dc2626;
   --semantic-danger-soft: #ef4444;
   --semantic-success: #16a34a;
+  --semantic-warning: #d97706;
 
   --overlay: rgba(0, 0, 0, 0.3);
 
@@ -125,6 +127,7 @@
   --color-semantic-danger: var(--semantic-danger);
   --color-semantic-danger-soft: var(--semantic-danger-soft);
   --color-semantic-success: var(--semantic-success);
+  --color-semantic-warning: var(--semantic-warning);
 
   --color-overlay: var(--overlay);
 }

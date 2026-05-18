@@ -7,6 +7,7 @@
 
 ## Recently Completed
 
+- [x] Cloud folder sync (point Silo at iCloud/Dropbox/Google Drive/OneDrive to sync config across machines; surfaces "currently offline" state when the folder is unavailable)
 - [x] macOS seamless title bar (hidden title bar + traffic lights in sidebar)
 - [x] Topbar tabs (new-window links open as child tabs in the nav bar)
 - [x] Webview context menu (native right-click menu on links: Open in New Tab, Open in Default Browser, Copy Link)

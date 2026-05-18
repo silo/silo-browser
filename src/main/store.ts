@@ -1,6 +1,6 @@
 import { app } from 'electron'
-import { readFileSync, existsSync } from 'fs'
-import { writeFile, mkdir } from 'fs/promises'
+import { readFileSync, existsSync, statSync } from 'fs'
+import { writeFile, mkdir, rename, unlink } from 'fs/promises'
 import { join, dirname } from 'path'
 
 export interface PersistedState {
@@ -17,11 +17,19 @@ export interface PersistedState {
   defaultSleepAfterMinutes: number
   confirmCloseChildTabs: boolean
   defaultUserAgent: string
+  // Unix ms timestamp set on every saveState. 0 = never saved.
+  // Stored in the config so a future "pick-newer between sync folder and
+  // userData" logic can compare candidates honestly across devices, independent
+  // of filesystem mtime (which cloud clients re-stamp on download).
+  lastSaved: number
 }
 
 const VALID_THEME_MODES = ['dark', 'light', 'system']
 const VALID_ACCENT_COLORS = ['blue', 'green', 'amber', 'red', 'violet', 'pink', 'cyan', 'orange', 'gray']
 const VALID_SURFACE_COLORS = ['neutral', 'charcoal', 'slate', 'navy', 'forest', 'wine', 'plum', 'teal', 'earth']
+
+const CONFIG_FILENAME = 'silo-config.json'
+const LOCAL_PREFS_FILENAME = 'silo-prefs.local.json'
 
 const defaultState: PersistedState = {
   groups: [],
@@ -36,19 +44,93 @@ const defaultState: PersistedState = {
   grantedPermissions: [],
   defaultSleepAfterMinutes: 0,
   confirmCloseChildTabs: false,
-  defaultUserAgent: ''
+  defaultUserAgent: '',
+  lastSaved: 0
 }
 
 let cachedState: PersistedState = { ...defaultState }
+let syncFolderPath: string | null = null
+let localPrefsLoaded = false
+let writeCounter = 0
+let writeChain: Promise<void> = Promise.resolve()
 
-function getStorePath(): string {
-  return join(app.getPath('userData'), 'silo-config.json')
+function getLocalPrefsPath(): string {
+  return join(app.getPath('userData'), LOCAL_PREFS_FILENAME)
+}
+
+function loadLocalPrefs(): void {
+  if (localPrefsLoaded) return
+  localPrefsLoaded = true
+  try {
+    const path = getLocalPrefsPath()
+    if (!existsSync(path)) return
+    const raw = readFileSync(path, 'utf-8')
+    const parsed = JSON.parse(raw)
+    if (typeof parsed.syncFolderPath === 'string' && parsed.syncFolderPath.length > 0) {
+      syncFolderPath = parsed.syncFolderPath
+    }
+  } catch (err) {
+    console.error('Failed to read local prefs:', err)
+  }
+}
+
+// Atomic JSON write: write to a unique temp file, then rename. The pid+counter
+// suffix avoids two concurrent writes (multiple Silo instances on the same sync
+// folder, or in-process races not covered by the writeChain) clobbering the
+// same temp file. On failure, the temp file is cleaned up and the error is
+// rethrown so callers can decide whether to surface it.
+async function atomicWriteJson(targetPath: string, data: unknown): Promise<void> {
+  await mkdir(dirname(targetPath), { recursive: true })
+  const tmp = `${targetPath}.tmp-${process.pid}-${++writeCounter}`
+  try {
+    await writeFile(tmp, JSON.stringify(data, null, 2))
+    await rename(tmp, targetPath)
+  } catch (err) {
+    await unlink(tmp).catch(() => {})
+    throw err
+  }
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
+}
+
+let warnedInaccessibleFolder: string | null = null
+
+function getConfigPath(): string {
+  loadLocalPrefs()
+  if (syncFolderPath && isDirectory(syncFolderPath)) {
+    warnedInaccessibleFolder = null
+    return join(syncFolderPath, CONFIG_FILENAME)
+  }
+  if (syncFolderPath && warnedInaccessibleFolder !== syncFolderPath) {
+    console.warn(
+      `Silo sync folder not accessible (${syncFolderPath}); falling back to local storage.`
+    )
+    warnedInaccessibleFolder = syncFolderPath
+  }
+  return join(app.getPath('userData'), CONFIG_FILENAME)
 }
 
 export function loadState(): PersistedState {
-  const storePath = getStorePath()
+  const storePath = getConfigPath()
   try {
-    if (!existsSync(storePath)) return { ...defaultState }
+    if (!existsSync(storePath)) {
+      cachedState = { ...defaultState }
+      return cachedState
+    }
     const raw = readFileSync(storePath, 'utf-8')
     const parsed = JSON.parse(raw)
     const state: PersistedState = {
@@ -83,12 +165,16 @@ export function loadState(): PersistedState {
       confirmCloseChildTabs:
         typeof parsed.confirmCloseChildTabs === 'boolean' ? parsed.confirmCloseChildTabs : false,
       defaultUserAgent:
-        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : ''
+        typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : '',
+      lastSaved:
+        typeof parsed.lastSaved === 'number' && parsed.lastSaved >= 0 ? parsed.lastSaved : 0
     }
     cachedState = { ...state }
     return state
-  } catch {
-    return { ...defaultState }
+  } catch (err) {
+    console.error('Failed to load state; falling back to defaults:', err)
+    cachedState = { ...defaultState }
+    return cachedState
   }
 }
 
@@ -97,13 +183,80 @@ export function getCachedState(): PersistedState {
 }
 
 export async function saveState(partial: Partial<PersistedState>): Promise<void> {
-  cachedState = { ...cachedState, ...partial }
-  const storePath = getStorePath()
-  try {
-    const dir = dirname(storePath)
-    await mkdir(dir, { recursive: true })
-    await writeFile(storePath, JSON.stringify(cachedState, null, 2))
-  } catch (err) {
-    console.error('Failed to save state:', err)
+  cachedState = { ...cachedState, ...partial, lastSaved: Date.now() }
+  // Serialize disk writes so a slower older write can't rename-clobber a faster
+  // newer one on disk. Each queued task reads cachedState fresh at execution
+  // time, so the on-disk file always converges to the latest cachedState.
+  const task = writeChain.then(async () => {
+    try {
+      await atomicWriteJson(getConfigPath(), cachedState)
+    } catch (err) {
+      console.error('Failed to save state:', err)
+    }
+  })
+  writeChain = task
+  return task
+}
+
+export function getSyncFolderInfo(): { path: string | null; accessible: boolean } {
+  loadLocalPrefs()
+  if (!syncFolderPath) return { path: null, accessible: false }
+  return { path: syncFolderPath, accessible: isDirectory(syncFolderPath) }
+}
+
+export function peekSyncFolder(path: string): { valid: boolean; hasExistingConfig: boolean } {
+  if (!isDirectory(path)) return { valid: false, hasExistingConfig: false }
+  return { valid: true, hasExistingConfig: isFile(join(path, CONFIG_FILENAME)) }
+}
+
+export async function setSyncFolderPath(
+  path: string | null,
+  mode: 'use-existing' | 'overwrite' = 'overwrite'
+): Promise<PersistedState> {
+  loadLocalPrefs()
+
+  if (path !== null && !isDirectory(path)) {
+    throw new Error(`Sync folder is not accessible: ${path}`)
   }
+
+  // Do all the risky work first, BEFORE mutating any module state. If any step
+  // throws, we exit here and nothing has changed — no rollback needed.
+  const adopting =
+    path !== null && mode === 'use-existing' && isFile(join(path, CONFIG_FILENAME))
+
+  if (adopting) {
+    // Validate the existing file is parseable. Without this, loadState()'s catch
+    // would silently return defaults while leaving cachedState untouched —
+    // adopting "succeeds" but the renderer keeps showing the previous data.
+    try {
+      JSON.parse(readFileSync(join(path!, CONFIG_FILENAME), 'utf-8'))
+    } catch {
+      throw new Error(`Existing config in ${path} is not valid JSON; refusing to adopt.`)
+    }
+  } else {
+    // Write current cachedState to the future config location BEFORE committing
+    // the pointer change. This covers three cases:
+    //   - Overwrite onto an existing sync folder: replaces the cloud file.
+    //   - Setting a new sync folder: seeds the file.
+    //   - Clearing sync (path === null): persists current state to userData so
+    //     a quit immediately after Clear doesn't lose the session's data to a
+    //     stale local config.
+    // A failure here (read-only folder, disk full) surfaces before any in-memory
+    // mutation, so the previous setup stays intact.
+    cachedState = { ...cachedState, lastSaved: Date.now() }
+    const futureConfigPath =
+      path !== null
+        ? join(path, CONFIG_FILENAME)
+        : join(app.getPath('userData'), CONFIG_FILENAME)
+    await atomicWriteJson(futureConfigPath, cachedState)
+  }
+
+  // Persist the new pointer atomically, then commit the in-memory mutation.
+  // Writing local prefs last means a failure leaves the previous pointer
+  // intact both on disk and in memory.
+  await atomicWriteJson(getLocalPrefsPath(), { syncFolderPath: path })
+  syncFolderPath = path
+  warnedInaccessibleFolder = null
+
+  return adopting ? loadState() : cachedState
 }

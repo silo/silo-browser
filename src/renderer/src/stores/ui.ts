@@ -115,6 +115,9 @@ export const useUiStore = defineStore('ui', () => {
   const defaultSleepAfterMinutes = ref(0)
   const confirmCloseChildTabs = ref(false)
   const defaultUserAgent = ref('')
+  const syncFolderPath = ref<string | null>(null)
+  const syncFolderAccessible = ref(false)
+  const lastSaved = ref<number>(0)
 
   function setOpenLinksInNewTab(value: boolean): void {
     openLinksInNewTab.value = value
@@ -134,6 +137,29 @@ export const useUiStore = defineStore('ui', () => {
   function setDefaultUserAgent(value: string): void {
     defaultUserAgent.value = value
     window.api.saveDefaultUserAgent(value)
+  }
+
+  async function refreshLastSaved(): Promise<void> {
+    const state = await window.api.getState()
+    lastSaved.value = state.lastSaved ?? 0
+  }
+
+  async function configureSyncFolder(): Promise<boolean> {
+    const result = await window.api.configureSyncFolder()
+    if (!result) return false
+    syncFolderPath.value = result.folder
+    syncFolderAccessible.value = true
+    return true
+  }
+
+  async function clearSyncFolder(): Promise<void> {
+    const result = await window.api.clearSyncFolder()
+    // null = main process surfaced an error dialog; leave UI state untouched
+    // so it reflects the actual (unchanged) sync configuration.
+    if (result !== null) {
+      syncFolderPath.value = null
+      syncFolderAccessible.value = false
+    }
   }
 
   // --- Theme ---
@@ -367,9 +393,18 @@ export const useUiStore = defineStore('ui', () => {
     defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
     confirmCloseChildTabs.value = (state.confirmCloseChildTabs as boolean | undefined) ?? false
     defaultUserAgent.value = (state.defaultUserAgent as string | undefined) ?? ''
+    lastSaved.value = (state.lastSaved as number | undefined) ?? 0
     themeMode.value = (state.themeMode as ThemeMode | undefined) ?? 'dark'
     accentColor.value = (state.accentColor as AccentColor | undefined) ?? 'gray'
     surfaceColor.value = (state.surfaceColor as string | undefined) ?? 'charcoal'
+    try {
+      const info = await window.api.getSyncFolder()
+      syncFolderPath.value = info.path
+      syncFolderAccessible.value = info.accessible
+    } catch {
+      syncFolderPath.value = null
+      syncFolderAccessible.value = false
+    }
     applyTheme()
   }
 
@@ -419,6 +454,12 @@ export const useUiStore = defineStore('ui', () => {
     setConfirmCloseChildTabs,
     defaultUserAgent,
     setDefaultUserAgent,
+    syncFolderPath,
+    syncFolderAccessible,
+    lastSaved,
+    refreshLastSaved,
+    configureSyncFolder,
+    clearSyncFolder,
     permissionRequest,
     showPermissionRequest,
     respondToPermission,
