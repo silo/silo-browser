@@ -8,7 +8,9 @@ using Electron's `session.fromPartition()`.
 ## Tech Stack
 - **Runtime**: Electron 45 (Chromium 156, Node 24) — see "Updating Electron & Dependencies"
 - **Build tool**: electron-vite (https://electron-vite.org)
-- **Package manager**: pnpm
+- **Package manager**: pnpm 12, pinned via `packageManager` in package.json. Corepack/pnpm switches to it
+  automatically, and CI's `pnpm/action-setup` reads it too, so don't add `version:` there. Settings live in
+  `pnpm-workspace.yaml` (`allowBuilds`, `shamefullyHoist`, `minimumReleaseAgeExclude`), not in package.json.
 - **Framework**: Vue 3 + TypeScript + Pinia
 - **Styling**: Tailwind CSS v4 (using @tailwindcss/vite plugin)
 - **Packaging**: electron-builder
@@ -140,6 +142,10 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 A weekly Orca automation ("Weekly Electron & dependency check") follows this checklist. Apply it to manual upgrades too.
 
 1. `pnpm install`, then `npm view electron dist-tags --json` and `pnpm outdated`.
+   pnpm refuses package versions published less than 24h ago (`minimumReleaseAge`, default 1440 min), both when
+   resolving and when verifying the lockfile in CI. A brand-new Electron release can't be installed or released
+   until it's 24h old, unless you add an exact-version entry to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml`.
+   Remove entries from that list once the version is older than 24h.
 2. Support window: Electron supports only the **newest 3 stable majors**. If our major has dropped out, we're
    getting no Chromium security fixes, and updating is urgent (Silo loads untrusted web content).
    Electron ships patch releases almost every week. Pick them up regularly.

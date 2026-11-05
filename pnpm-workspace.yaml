@@ -1,0 +1,16 @@
+# pnpm settings. pnpm 11+ no longer reads the "pnpm" field in package.json.
+# The pnpm version itself is pinned via "packageManager" in package.json.
+shamefullyHoist: true
+
+# Dependencies allowed to run install scripts (pnpm fails on unlisted ones)
+allowBuilds:
+  esbuild: true
+  sharp: true
+  electron-winstaller: false
+
+# pnpm refuses packages published less than 24h ago (minimumReleaseAge).
+# Exact-version exceptions for the v1.8.0 release (tested). Remove each entry
+# once that version is older than 24h; the weekly update check does this.
+minimumReleaseAgeExclude:
+  - electron@45.2.3
+  - undici@7.30.2

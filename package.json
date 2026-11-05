@@ -51,11 +51,5 @@
     "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^3.2.7"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild",
-      "sharp"
-    ]
-  }
+  "packageManager": "pnpm@12.16.1"
 }
