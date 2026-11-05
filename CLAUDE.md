@@ -6,6 +6,7 @@ session-isolated groups. Each group maintains its own cookies, localStorage, and
 using Electron's `session.fromPartition()`.
 
 ## Tech Stack
+- **Runtime**: Electron 45 (Chromium 156, Node 24) — see "Updating Electron & Dependencies"
 - **Build tool**: electron-vite (https://electron-vite.org)
 - **Package manager**: pnpm
 - **Framework**: Vue 3 + TypeScript + Pinia
@@ -106,6 +107,55 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `target=_blank` / `window.open()` links are handled via `setWindowOpenHandler` in main process (not deprecated `new-window` event)
 - `openLinksInNewTab` setting (persisted) controls whether _blank links open as topbar tabs or in the system browser
 - `app-drag` and `app-no-drag` CSS classes control macOS window dragging regions
+
+## Release Process
+1. Land changes on `main` (commit directly, or fast-forward a feature branch:
+   `git push origin <branch>:main`).
+2. Bump `version` in `package.json` in its own commit, with the message `vX.Y.Z` and no other changes.
+3. Tag that commit `vX.Y.Z`, then push main and the tag: `git push origin main && git push origin vX.Y.Z`.
+4. The tag triggers `.github/workflows/release.yml`. It builds macOS arm64 (signed + notarized),
+   Windows (NSIS) and Linux (AppImage + deb) and publishes them to GitHub Releases. Watch the run with `gh run watch`.
+5. Check that the release has all assets (dmg, mac zip, setup.exe, AppImage, deb, `latest*.yml`, blockmaps).
+   electron-updater reads `latest*.yml`, so installed apps pick up the release automatically.
+6. Write release notes with `gh release edit vX.Y.Z --notes ...`: short user-facing bullets, then
+   `**Full Changelog**: https://github.com/silo/silo-browser/compare/vPREV...vX.Y.Z`.
+- Versioning: patch = fixes, minor = features, an Electron major upgrade, or a dropped OS version.
+- Never tag or release without the maintainer's explicit go. A release reaches every user through auto-update.
+
+## Updating Electron & Dependencies
+A weekly Orca automation ("Weekly Electron & dependency check") follows this checklist. Apply it to manual upgrades too.
+
+1. `pnpm install`, then `npm view electron dist-tags --json` and `pnpm outdated`.
+2. Support window: Electron supports only the **newest 3 stable majors**. If our major has dropped out, we're
+   getting no Chromium security fixes, and updating is urgent (Silo loads untrusted web content).
+   Electron ships patch releases almost every week. Pick them up regularly.
+3. For each major we skip, read the breaking changes doc:
+   https://github.com/electron/electron/blob/main/docs/breaking-changes.md. Grep `src/` for anything it touches.
+   Areas that have been affected before:
+   - Permission handlers (`setPermissionRequestHandler` / `setPermissionCheckHandler` in `src/main/index.ts`)
+   - `clipboard` (main-process only; async since 44)
+   - The sandboxed webview preload `src/preload/webview.ts`: no `Buffer`, `setImmediate`, or `require` of Node modules (45+)
+   - `setWindowOpenHandler` / popups
+   - Dialogs (`src/main/ipc-handlers.ts`)
+   - Notifications (macOS needs a code-signed app since 42)
+   - `session.clearStorageData`
+4. Keep `@types/node` on the Node major that Electron ships with (`process.versions.node`; see releases.electronjs.org).
+5. Electron no longer downloads its binary on install (since 42). The `postinstall` script runs `install-electron`,
+   because electron-vite needs `node_modules/electron/path.txt`. Keep it.
+6. If a new major drops an OS version, update `minimumSystemVersion` in `electron-builder.yml` and say so in the release notes.
+7. electron-vite's built-in Electron→Node/Chrome target table can lag behind. Builds then fall back to its newest
+   known target, which works fine.
+8. Verify with `pnpm typecheck`, `pnpm exec electron-vite build`, `pnpm dev`, and `pnpm build:mac:fast`.
+   `pnpm lint` has errors that were already there; just don't add new ones.
+9. Manual smoke test before release:
+   - Google/Gmail sign-in
+   - Web notifications and sidebar badges
+   - Screen sharing (Meet/Teams)
+   - Mic/camera permission prompt
+   - Right-click → Copy Link Address
+   - Open a PDF
+   - Config export/import dialogs
+   - Auto-update from the previous version
 
 ## Remaining Features (not yet implemented)
 - Split view (two tabs side by side)

@@ -25,6 +25,8 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # Electron 44+ requires macOS 13 (Ventura) or later
+  minimumSystemVersion: '13.0'
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   hardenedRuntime: true

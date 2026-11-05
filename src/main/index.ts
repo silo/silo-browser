@@ -339,7 +339,7 @@ app.on('web-contents-created', (_event, contents) => {
           new MenuItem({
             label: 'Copy Link Address',
             click: () => {
-              clipboard.writeText(params.linkURL)
+              clipboard.writeText(params.linkURL).catch(() => {})
             }
           })
         )
