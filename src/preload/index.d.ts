@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { AppState, GroupItem } from '../renderer/src/types'
+import type { AppState, DisplayMediaPickRequest, GroupItem } from '../renderer/src/types'
 
 export interface SiloApi {
   platform: string
@@ -52,6 +52,9 @@ export interface SiloApi {
   ) => void
   removePermissionRequestListener: () => void
   respondToPermission: (requestId: number, granted: boolean) => void
+  onDisplayMediaPick: (callback: (data: DisplayMediaPickRequest) => void) => void
+  removeDisplayMediaPickListener: () => void
+  respondToDisplayMediaPick: (requestId: number, sourceId: string | null) => void
 }
 
 declare global {

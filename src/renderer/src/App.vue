@@ -29,6 +29,9 @@ const ConfirmRemoveTabDialog = defineAsyncComponent(
 const UpdateDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/UpdateDialog.vue')
 )
+const DisplayMediaPickerDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/DisplayMediaPickerDialog.vue')
+)
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
@@ -67,6 +70,11 @@ onMounted(async () => {
   // Listen for permission requests from webview sessions
   window.api.onPermissionRequest((data) => {
     uiStore.showPermissionRequest(data)
+  })
+
+  // Screen sharing source picker (when the native system picker isn't available)
+  window.api.onDisplayMediaPick((data) => {
+    uiStore.showDisplayMediaPick(data)
   })
 
   // Listen for menu shortcuts from main process
@@ -113,6 +121,7 @@ onUnmounted(() => {
   window.api.removeZoomOutListener()
   window.api.removeZoomResetListener()
   window.api.removePermissionRequestListener()
+  window.api.removeDisplayMediaPickListener()
   window.api.removeFindListener()
 })
 
@@ -219,6 +228,7 @@ function handleKeydown(e: KeyboardEvent): void {
   // Escape — close topmost layer first
   if (e.key === 'Escape') {
     if (uiStore.contextMenuVisible) { uiStore.hideContextMenu(); return }
+    if (uiStore.displayMediaPick) { uiStore.respondToDisplayMediaPick(null); return }
     if (uiStore.addGroupDialogOpen) { uiStore.closeAddGroupDialog(); return }
     if (uiStore.addTabDialogOpen) { uiStore.closeAddTabDialog(); return }
     if (uiStore.editGroupDialogOpen) { uiStore.closeEditGroupDialog(); return }
@@ -245,4 +255,8 @@ function handleKeydown(e: KeyboardEvent): void {
   <EditTabDialog v-if="uiStore.editTabDialogOpen" />
   <ConfirmRemoveTabDialog v-if="uiStore.confirmRemoveTabDialogOpen" />
   <UpdateDialog v-if="uiStore.updateDialogOpen" />
+  <DisplayMediaPickerDialog
+    v-if="uiStore.displayMediaPick"
+    :key="uiStore.displayMediaPick.requestId"
+  />
 </template>

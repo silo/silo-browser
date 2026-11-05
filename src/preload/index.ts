@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { join } from 'path'
 import { electronAPI } from '@electron-toolkit/preload'
 
+interface DisplayMediaPickRequest {
+  requestId: number
+  origin: string
+  sources: { id: string; name: string; thumbnail: string; isScreen: boolean }[]
+}
+
 const api = {
   platform: process.platform as string,
   webviewPreloadPath: `file://${join(__dirname, 'webview.js')}`,
@@ -134,6 +140,17 @@ const api = {
   },
   respondToPermission: (requestId: number, granted: boolean): void => {
     ipcRenderer.send('permission:response', { requestId, granted })
+  },
+  onDisplayMediaPick: (callback: (data: DisplayMediaPickRequest) => void): void => {
+    ipcRenderer.on('display-media:pick', (_event, data: DisplayMediaPickRequest) => {
+      callback(data)
+    })
+  },
+  removeDisplayMediaPickListener: (): void => {
+    ipcRenderer.removeAllListeners('display-media:pick')
+  },
+  respondToDisplayMediaPick: (requestId: number, sourceId: string | null): void => {
+    ipcRenderer.send('display-media:response', { requestId, sourceId })
   }
 }
 

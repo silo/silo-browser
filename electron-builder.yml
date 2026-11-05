@@ -35,6 +35,8 @@ mac:
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+    - NSLocationUsageDescription: Websites you use in Silo can request your location.
+    - NSLocationWhenInUseUsageDescription: Websites you use in Silo can request your location.
   notarize: true
 dmg:
   artifactName: ${name}-${version}.${ext}

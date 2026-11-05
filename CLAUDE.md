@@ -60,6 +60,8 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `pnpm build:mac` — Package for macOS
 - `pnpm build:win` — Package for Windows
 - `pnpm build:linux` — Package for Linux
+- `pnpm sign:dev-electron` — (macOS) Sign `node_modules/electron/dist/Electron.app` with your local
+  code-signing identity so notifications work in `pnpm dev`. Re-run after every Electron update.
 
 ## Keyboard Shortcuts
 - `Cmd/Ctrl+T` — Add new tab (to first group)
@@ -80,6 +82,7 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `store:save-sidebar-state` — Persists sidebar expanded
 - `store:save-open-links-in-new-tab` — Persists link opening behavior setting
 - `store:clear-group-session` — Clears session data for a group partition
+- `display-media:pick` / `display-media:response` — Screen-share source picker (main ⇄ renderer)
 - `shell:open-external` — Opens URL in system browser
 - `dialog:export-config` — Export config to JSON file
 - `dialog:import-config` — Import config from JSON file
@@ -107,6 +110,17 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `target=_blank` / `window.open()` links are handled via `setWindowOpenHandler` in main process (not deprecated `new-window` event)
 - `openLinksInNewTab` setting (persisted) controls whether _blank links open as topbar tabs or in the system browser
 - `app-drag` and `app-no-drag` CSS classes control macOS window dragging regions
+- Screen sharing (`getDisplayMedia`) goes through `ses.setDisplayMediaRequestHandler` in `src/main/index.ts`.
+  On macOS 15+ the native system picker is used. Elsewhere `desktopCapturer` sources are shown in
+  `DisplayMediaPickerDialog.vue`.
+- macOS notifications need a properly signed app (since Electron 42). The npm Electron.app is ad-hoc signed,
+  so run `pnpm sign:dev-electron` for dev. Note that `codesign` on this Mac can't match the identity *name*
+  (non-ASCII "Ö"), so sign by SHA-1 hash.
+- Web Push (`pushManager.subscribe`) is not supported in Electron: there is no push service. Only the in-page
+  Notification API works.
+- Geolocation on macOS does not work yet. Info.plist keys and the location entitlement are in place, but
+  nothing asks macOS for location authorization (Chrome does this from its own UI), so requests time out.
+  A fix needs a native CoreLocation authorization call from the main process.
 
 ## Release Process
 1. Land changes on `main` (commit directly, or fast-forward a feature branch:
@@ -137,7 +151,7 @@ A weekly Orca automation ("Weekly Electron & dependency check") follows this che
    - The sandboxed webview preload `src/preload/webview.ts`: no `Buffer`, `setImmediate`, or `require` of Node modules (45+)
    - `setWindowOpenHandler` / popups
    - Dialogs (`src/main/ipc-handlers.ts`)
-   - Notifications (macOS needs a code-signed app since 42)
+   - Notifications (macOS needs a code-signed app since 42; re-run `pnpm sign:dev-electron`)
    - `session.clearStorageData`
 4. Keep `@types/node` on the Node major that Electron ships with (`process.versions.node`; see releases.electronjs.org).
 5. Electron no longer downloads its binary on install (since 42). The `postinstall` script runs `install-electron`,

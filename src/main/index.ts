@@ -5,6 +5,7 @@ import {
   Menu,
   MenuItem,
   clipboard,
+  desktopCapturer,
   nativeTheme,
   ipcMain,
   webContents,
@@ -118,9 +119,74 @@ ipcMain.on(
   }
 )
 
+// ── Screen sharing (getDisplayMedia) ────────────────────────────────────────
+// On macOS 15+ the native system picker is used and the handler below is never
+// called. Elsewhere (Windows, Linux, older macOS) we list sources with
+// desktopCapturer and let the user choose one in Silo's picker dialog.
+let displayMediaPickId = 0
+const pendingDisplayMediaPicks = new Map<number, (sourceId: string | null) => void>()
+
+ipcMain.on(
+  'display-media:response',
+  (_event, { requestId, sourceId }: { requestId: number; sourceId: string | null }) => {
+    const resolve = pendingDisplayMediaPicks.get(requestId)
+    if (resolve) {
+      pendingDisplayMediaPicks.delete(requestId)
+      resolve(typeof sourceId === 'string' ? sourceId : null)
+    }
+  }
+)
+
+async function pickDisplayMediaSource(
+  origin: string
+): Promise<Electron.DesktopCapturerSource | null> {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen', 'window'],
+    thumbnailSize: { width: 320, height: 180 }
+  })
+  if (sources.length === 0) return null
+  // Linux/Wayland: the desktop portal already let the user pick exactly one source
+  if (sources.length === 1) return sources[0]
+
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return null
+
+  const requestId = ++displayMediaPickId
+  const chosenId = await new Promise<string | null>((resolve) => {
+    pendingDisplayMediaPicks.set(requestId, resolve)
+    win.webContents.send('display-media:pick', {
+      requestId,
+      origin,
+      sources: sources.map((s) => ({
+        id: s.id,
+        name: s.name,
+        thumbnail: s.thumbnail.toDataURL(),
+        isScreen: s.id.startsWith('screen:')
+      }))
+    })
+  })
+  // Only accept an id we offered
+  return sources.find((s) => s.id === chosenId) ?? null
+}
+
 function setupPermissionHandlers(ses: Electron.Session): void {
   if (handledSessions.has(ses)) return
   handledSessions.add(ses)
+
+  ses.setDisplayMediaRequestHandler(
+    (request, callback) => {
+      pickDisplayMediaSource(request.securityOrigin)
+        .then((source) => {
+          if (!source) return callback(null)
+          // System audio capture is only supported on Windows
+          const audio =
+            request.audioRequested && process.platform === 'win32' ? 'loopback' : undefined
+          callback(audio ? { video: source, audio } : { video: source })
+        })
+        .catch(() => callback(null))
+    },
+    { useSystemPicker: true }
+  )
 
   // Strip Electron/app identifiers from this session's user agent so sites
   // (especially Google sign-in) see a standard Chrome UA.

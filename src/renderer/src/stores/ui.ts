@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { AccentColor, ContextMenuEntry, SurfaceColor, ThemeMode } from '@renderer/types'
+import type {
+  AccentColor,
+  ContextMenuEntry,
+  DisplayMediaPickRequest,
+  SurfaceColor,
+  ThemeMode
+} from '@renderer/types'
 
 export const useUiStore = defineStore('ui', () => {
   const sidebarExpanded = ref(true)
@@ -309,6 +315,24 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
+  // --- Screen sharing source picker (Windows, Linux, macOS < 15) ---
+  const displayMediaPick = ref<DisplayMediaPickRequest | null>(null)
+
+  function showDisplayMediaPick(data: DisplayMediaPickRequest): void {
+    // Cancel any pending pick before showing a new one
+    if (displayMediaPick.value) {
+      window.api.respondToDisplayMediaPick(displayMediaPick.value.requestId, null)
+    }
+    displayMediaPick.value = data
+  }
+
+  function respondToDisplayMediaPick(sourceId: string | null): void {
+    if (displayMediaPick.value) {
+      window.api.respondToDisplayMediaPick(displayMediaPick.value.requestId, sourceId)
+      displayMediaPick.value = null
+    }
+  }
+
   // --- Find bar ---
   const findBarOpen = ref(false)
   function openFindBar(): void {
@@ -422,6 +446,9 @@ export const useUiStore = defineStore('ui', () => {
     permissionRequest,
     showPermissionRequest,
     respondToPermission,
+    displayMediaPick,
+    showDisplayMediaPick,
+    respondToDisplayMediaPick,
     findBarOpen,
     openFindBar,
     closeFindBar,

@@ -21,7 +21,8 @@
     "build:mac:fast": "npm run build && electron-builder --mac --dir --arm64 --publish never -c.compression=store",
     "build:mac:test": "npm run build && electron-builder --mac --arm64 --publish never",
     "build:linux": "npm run build && electron-builder --linux --publish never",
-    "generate-icons": "node scripts/generate-icons.mjs"
+    "generate-icons": "node scripts/generate-icons.mjs",
+    "sign:dev-electron": "node scripts/sign-dev-electron.mjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

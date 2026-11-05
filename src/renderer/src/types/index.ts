@@ -69,3 +69,16 @@ export interface ContextMenuSeparator {
 }
 
 export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator
+
+export interface DisplayMediaSource {
+  id: string
+  name: string
+  thumbnail: string // data URL
+  isScreen: boolean
+}
+
+export interface DisplayMediaPickRequest {
+  requestId: number
+  origin: string
+  sources: DisplayMediaSource[]
+}
