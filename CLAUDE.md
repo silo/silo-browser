@@ -134,6 +134,9 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
    (electron-builder's default). Watch the run with `gh run watch`.
    - If a job never starts ("not acquired by Runner", which happens with macOS arm64 capacity), re-run just
      that job: `gh run rerun <run-id> --job <job-id>`. It uploads into the existing draft.
+   - Notarization `HTTP status code: 403. A required agreement is missing or has expired` means Apple published
+     a new Developer Program agreement. The Account Holder must accept it at https://developer.apple.com/account,
+     then re-run the macOS job.
 5. Check that the draft has all assets (dmg, mac zip, setup.exe, AppImage, deb, `latest.yml`, `latest-mac.yml`,
    `latest-linux.yml`, blockmaps).
 6. Publish it with release notes:
