@@ -9,7 +9,7 @@ allowBuilds:
   electron-winstaller: false
 
 # pnpm refuses packages published less than 24h ago (minimumReleaseAge).
-# Exact-version exceptions for the v1.8.0 release (tested). Remove each entry
-# once that version is older than 24h; the weekly update check does this.
-minimumReleaseAgeExclude:
-  - undici@7.30.2
+# Exact-version exceptions (e.g. `- electron@45.2.3`) for a release that can't
+# wait. Remove each entry once that version is older than 24h; the weekly
+# update check does this.
+minimumReleaseAgeExclude: []
