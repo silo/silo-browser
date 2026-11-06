@@ -130,11 +130,20 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 2. Bump `version` in `package.json` in its own commit, with the message `vX.Y.Z` and no other changes.
 3. Tag that commit `vX.Y.Z`, then push main and the tag: `git push origin main && git push origin vX.Y.Z`.
 4. The tag triggers `.github/workflows/release.yml`. It builds macOS arm64 (signed + notarized),
-   Windows (NSIS) and Linux (AppImage + deb) and publishes them to GitHub Releases. Watch the run with `gh run watch`.
-5. Check that the release has all assets (dmg, mac zip, setup.exe, AppImage, deb, `latest*.yml`, blockmaps).
-   electron-updater reads `latest*.yml`, so installed apps pick up the release automatically.
-6. Write release notes with `gh release edit vX.Y.Z --notes ...`: short user-facing bullets, then
+   Windows (NSIS) and Linux (AppImage + deb) and uploads them to a **draft** GitHub release
+   (electron-builder's default). Watch the run with `gh run watch`.
+   - If a job never starts ("not acquired by Runner", which happens with macOS arm64 capacity), re-run just
+     that job: `gh run rerun <run-id> --job <job-id>`. It uploads into the existing draft.
+5. Check that the draft has all assets (dmg, mac zip, setup.exe, AppImage, deb, `latest.yml`, `latest-mac.yml`,
+   `latest-linux.yml`, blockmaps).
+6. Publish it with release notes:
+   `gh release edit vX.Y.Z --draft=false --notes-file notes.md`.
+   Notes are short user-facing bullets, then
    `**Full Changelog**: https://github.com/silo/silo-browser/compare/vPREV...vX.Y.Z`.
+   Publishing is what releases it: electron-updater only sees published releases (`latest*.yml`).
+- `gh` must act as an account with write access to `silo/silo-browser`, or drafts are invisible and
+  edits/re-runs fail. If another account is active, prefix commands with
+  `GH_TOKEN=$(gh auth token --user silo)`.
 - Versioning: patch = fixes, minor = features, an Electron major upgrade, or a dropped OS version.
 - Never tag or release without the maintainer's explicit go. A release reaches every user through auto-update.
 

@@ -57,7 +57,10 @@ jobs:
         run: ${{ matrix.build_cmd }}
 
   release-macos:
-    runs-on: macos-latest
+    # Pinned: v1.7.0 was signed + notarized on macos-15. On newer images, codesign may fail to match
+    # the non-ASCII identity name ("Öcal"); move back to macos-latest once electron-builder signs by
+    # certificate hash (electron-builder 27, #10238).
+    runs-on: macos-15
 
     steps:
       - name: Checkout
