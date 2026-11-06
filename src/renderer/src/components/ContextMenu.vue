@@ -9,8 +9,10 @@ watch(
   () => uiStore.contextMenuVisible,
   async (visible) => {
     if (visible) {
+      uiStore.hideSidebarTooltip()
       await nextTick()
       adjustPosition()
+      menuRef.value?.querySelector<HTMLButtonElement>('button')?.focus()
     }
   }
 )
@@ -28,8 +30,15 @@ function adjustPosition(): void {
 }
 
 function handleAction(action: () => void): void {
-  action()
   uiStore.hideContextMenu()
+  action()
+}
+
+function moveFocus(e: KeyboardEvent, dir: 1 | -1): void {
+  e.preventDefault()
+  const buttons = Array.from(menuRef.value?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+  const i = buttons.indexOf(document.activeElement as HTMLButtonElement)
+  buttons[(i + dir + buttons.length) % buttons.length]?.focus()
 }
 </script>
 
@@ -43,15 +52,21 @@ function handleAction(action: () => void): void {
     >
       <div
         ref="menuRef"
-        class="absolute bg-surface-raised border border-border-light rounded-lg shadow-xl py-1 min-w-[180px]"
+        role="menu"
+        class="absolute flex min-w-[190px] flex-col rounded-xl bg-panel p-1 shadow-menu"
         :style="{ left: uiStore.contextMenuX + 'px', top: uiStore.contextMenuY + 'px' }"
         @click.stop
+        @keydown.down="moveFocus($event, 1)"
+        @keydown.up="moveFocus($event, -1)"
       >
         <template v-for="(item, i) in uiStore.contextMenuItems" :key="i">
-          <div v-if="item.separator" class="border-t border-border-default my-1" />
+          <div v-if="item.separator" class="mx-2 my-1 h-px bg-line" />
           <button
             v-else
-            class="w-full text-left px-3 py-1.5 text-sm text-fg-secondary hover:bg-surface-hover hover:text-fg-primary transition-colors"
+            type="button"
+            role="menuitem"
+            class="flex h-8 items-center rounded-lg px-2.5 text-left text-[13px] outline-none hover:bg-sel focus-visible:bg-sel"
+            :class="item.danger ? 'text-danger' : 'text-fg1'"
             @click="handleAction(item.action)"
           >
             {{ item.label }}

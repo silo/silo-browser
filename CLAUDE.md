@@ -36,25 +36,60 @@ We use `<webview>` tags (not WebContentsView) in the renderer.
 Webviews are created lazily (only when a tab is first clicked).
 Once created, webviews stay in the DOM but are toggled visible/invisible to avoid reloads.
 Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shortcuts.
+**Never move a webview to a different DOM parent** — that reloads it. App.vue lays the window out
+as one CSS grid and only changes `grid-template-areas` between layouts (expanded / collapsed /
+settings), so `TheContentArea` (and its webviews) keeps the same parent.
+
+### UI design
+The UI follows the design canvas "Silo Browser — new design", page **C · Combined**
+(claude.ai artifact `86c9d29b-a0f6-41d3-aa78-838b2afb34aa`). In the UI, groups are called **silos**;
+the code still says `group` (stores, IPC, `persist:silo-group-*` partitions — renaming those would
+sign users out).
+- Design tokens are CSS variables set on `<html>` by `useAppTheme()` from `utils/theme.ts`
+  (theme mode, 6 light + 6 dark shades, accent, silo tint). They are registered as Tailwind colors
+  in `assets/main.css` (`bg-chrome`, `text-fg2`, `bg-tab-on`, `shadow-card`, …).
+- **Silo tint:** the active silo's color is mixed into the window chrome (`--chrome`). The same
+  color is sent to the main process (`window:set-chrome-colors`) for the window background and
+  the Windows/Linux title bar overlay.
+- Fonts are bundled via `@fontsource-variable/*`: Instrument Sans (UI, `font-sans`),
+  Bricolage Grotesque (headings, `font-display`), JetBrains Mono (keys, `font-mono`).
+- Two sidebar layouts (`sidebarLayout`): `'rail'` (64px silo rail + 208px list of the selected
+  silo — the default for new installs) and `'sidebar'` (all silos in one 240px list — what
+  configs from before this setting fall back to). Both collapse to the same 60px icon column.
+  When switching silos the rail's tab list is re-keyed, so it swaps instantly instead of
+  animating.
+- Base CSS lives in `@layer base`, shared classes (`.btn`, `.switch`, `.field-input`,
+  `.select-field`) in `@layer components`. Unlayered CSS would override Tailwind utilities. Don't
+  name a component class like a generated utility (e.g. `text-field` collides with the `field`
+  color token).
 
 ## Key Files
 - `electron.vite.config.ts` — Unified Vite config (main + preload + renderer)
-- `src/main/index.ts` — Main process entry, creates BrowserWindow with webviewTag: true
-- `src/main/store.ts` — JSON file persistence for app state (groups, sidebar)
-- `src/main/ipc-handlers.ts` — All IPC handler registrations (store, shell, dialog)
+- `src/main/index.ts` — Main process entry, frameless BrowserWindow (traffic lights on macOS, title bar overlay on Windows/Linux), app menu + accelerators
+- `src/main/store.ts` — JSON file persistence; `normalizeState()` validates and migrates configs (startup + import)
+- `src/main/ipc-handlers.ts` — All IPC handler registrations (store, shell, dialog, window)
 - `src/preload/index.ts` — contextBridge API (window.api)
 - `src/preload/index.d.ts` — TypeScript declarations for SiloApi
-- `src/renderer/src/stores/groups.ts` — Primary Pinia store (groups, tabs, CRUD, reorder, notifications)
-- `src/renderer/src/stores/ui.ts` — UI state (sidebar, dialogs, context menu, settings)
-- `src/renderer/src/stores/topbar-tabs.ts` — Runtime-only store for child/topbar tabs
+- `src/renderer/src/stores/groups.ts` — Primary Pinia store (silos/groups, tabs, CRUD, reorder, notifications, sleep)
+- `src/renderer/src/stores/ui.ts` — UI state (sidebar + layout, dialogs, command bar, context menu, settings, theme)
+- `src/renderer/src/stores/topbar-tabs.ts` — Runtime-only store for child/topbar (pop-up) tabs
 - `src/renderer/src/types/index.ts` — Shared TypeScript interfaces
-- `src/renderer/src/App.vue` — Root component with keyboard shortcuts
+- `src/renderer/src/utils/theme.ts` — Design tokens: shades, accents, silo colors, tint levels
+- `src/renderer/src/utils/silo-icons.ts` — Built-in silo icons, emoji quick picks, logo upload → data URL
+- `src/renderer/src/composables/useAppTheme.ts` — Applies tokens + silo tint to `<html>`
+- `src/renderer/src/composables/useSidebarDnd.ts` — Drag-and-drop handlers shared by all sidebar layouts
+- `src/renderer/src/composables/useSiloMenus.ts` — Tab/silo context menus + tab status flags
+- `src/renderer/src/App.vue` — Root grid layout, keyboard shortcuts, IPC listeners
+- `src/renderer/src/components/CommandBar.vue` — ⌘L: search tabs in every silo, open/add an address
 - `src/renderer/src/components/ContextMenu.vue` — Generic right-click context menu
+- `src/renderer/src/components/common/` — `SiloTile`, `TabIcon`, `AppIcon`, `DialogShell`, `SiloLogo`
 - `src/renderer/src/components/content/WebviewContainer.vue` — Webview lifecycle + event tracking
-- `src/renderer/src/components/content/TheNavigationBar.vue` — URL bar + back/forward/reload + topbar tabs
+- `src/renderer/src/components/content/TheNavigationBar.vue` — 44px title row: back/forward/reload/home, pop-up tabs, address button, open externally
 - `src/renderer/src/components/content/ChildWebviewContainer.vue` — Webview for child (topbar) tabs
-- `src/renderer/src/components/sidebar/TheSidebar.vue` — Sidebar with settings gear icon
-- `src/renderer/src/components/dialogs/` — AddGroup, AddTab, EditGroup, EditTab, Settings dialogs
+- `src/renderer/src/components/content/WelcomeScreen.vue` / `EmptyState.vue` — no silos / no open tab
+- `src/renderer/src/components/sidebar/TheSidebar.vue` — Picks `SidebarFull`, `SidebarRail`, `SidebarCollapsed` or `SettingsRail`
+- `src/renderer/src/components/dialogs/` — `SiloDialog` (new + edit silo), AddTab, EditTab, ConfirmRemoveTab, Update
+- `src/renderer/src/components/settings/SettingsPage.vue` — Settings cards (look & feel, behaviour, silos, backup, shortcuts)
 
 ## Commands
 - `pnpm dev` — Start development with HMR
@@ -66,15 +101,17 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
   code-signing identity so notifications work in `pnpm dev`. Re-run after every Electron update.
 
 ## Keyboard Shortcuts
-- `Cmd/Ctrl+T` — Add new tab (to first group)
-- `Cmd/Ctrl+N` — Create new group
-- `Cmd/Ctrl+W` — Close active child tab (never closes primary sidebar tabs)
+Most are also app-menu accelerators so they work while a page has focus.
+- `Cmd/Ctrl+T` — Add new tab to the current silo
+- `Cmd/Ctrl+N` — Create new silo
+- `Cmd/Ctrl+W` — Close active child tab (asks before removing a primary sidebar tab)
 - `Cmd/Ctrl+R` — Reload active tab (child or main)
-- `Cmd/Ctrl+L` — Focus URL bar
-- `Cmd/Ctrl+[` or `]` — Toggle sidebar
+- `Cmd/Ctrl+L` — Open the command bar (search tabs / enter address)
+- `Cmd/Ctrl+F` — Find in page
+- `Cmd/Ctrl+[` or `]` — Toggle sidebar (renderer only; not a menu accelerator so pages keep it)
 - `Cmd/Ctrl+1-9` — Switch to Nth tab
 - `Cmd/Ctrl+,` — Open settings
-- `Escape` — Close context menu / settings
+- `Escape` — Close the topmost layer (context menu, command bar, dialogs, find bar, settings)
 
 ## IPC Channels
 - `store:get-state` — Returns full AppState
@@ -82,7 +119,10 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - `store:save-active-tab` — Persists activeTabId
 - `store:save-groups-and-active-tab` — Batched save for groups + activeTabId
 - `store:save-sidebar-state` — Persists sidebar expanded
+- `store:save-sidebar-layout` — Persists `'sidebar'` / `'rail'`
 - `store:save-open-links-in-new-tab` — Persists link opening behavior setting
+- `store:save-appearance` — Persists theme mode, accent, light/dark shade and silo tint
+- `window:set-chrome-colors` — Window background + Windows/Linux title bar overlay colors
 - `store:clear-group-session` — Clears session data for a group partition
 - `display-media:pick` / `display-media:response` — Screen-share source picker (main ⇄ renderer)
 - `shell:open-external` — Opens URL in system browser
@@ -92,7 +132,7 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 ## Conventions
 - Component names: `TheSidebar.vue` for singletons, `SidebarGroup.vue` for reusable
 - Pinia stores: Composition API style with `defineStore('name', () => {})`
-- IPC channels prefixed: `store:`, `shell:`, `dialog:`
+- IPC channels prefixed: `store:`, `shell:`, `dialog:`, `window:`
 - UUID generation: `crypto.randomUUID()` (available in Electron's renderer)
 - Tailwind only in renderer (not main/preload)
 - Types shared via `src/renderer/src/types/index.ts`
@@ -106,12 +146,13 @@ Each webview has a `data-tab-id` attribute for DOM queries from nav bar and shor
 - Tab `isLoaded`, `notificationCount`, `currentUrl`, `currentTitle` are runtime-only state
 - When deleting a group, call `session.fromPartition(partition).clearStorageData()`
 - Groups support optional `userAgent` field for custom user agent per group
-- macOS uses `titleBarStyle: 'hidden'` with traffic light spacer in sidebar
+- Groups have an optional `icon: { kind: 'letter' | 'emoji' | 'icon' | 'image', value }`; uploaded logos are stored as data URLs in the config. Legacy `iconEmoji` is migrated on load.
+- `titleBarStyle: 'hidden'` on every platform. macOS traffic lights sit at (16, 16) — keep `TRAFFIC_LIGHT_INSET` in `utils/platform.ts` in sync. Windows/Linux use `titleBarOverlay`; the `.wco-spacer` element reserves room for the OS buttons.
 - Child/topbar tabs are runtime-only (not persisted); managed by `topbar-tabs` store
 - Webview context menus are native Electron menus built in the main process via `app.on('web-contents-created')`
 - `target=_blank` / `window.open()` links are handled via `setWindowOpenHandler` in main process (not deprecated `new-window` event)
 - `openLinksInNewTab` setting (persisted) controls whether _blank links open as topbar tabs or in the system browser
-- `app-drag` and `app-no-drag` CSS classes control macOS window dragging regions
+- `app-drag` and `app-no-drag` CSS classes control window dragging regions (all platforms)
 - Screen sharing (`getDisplayMedia`) goes through `ses.setDisplayMediaRequestHandler` in `src/main/index.ts`.
   On macOS 15+ the native system picker is used. Elsewhere `desktopCapturer` sources are shown in
   `DisplayMediaPickerDialog.vue`.
@@ -191,3 +232,4 @@ A weekly Orca automation ("Weekly Electron & dependency check") follows this che
 
 ## Remaining Features (not yet implemented)
 - Split view (two tabs side by side)
+- Sync folder (iCloud Drive / Dropbox / Google Drive / OneDrive) — see `docs/ideas/sync-folder.md`

@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
-import type { GroupItem, TabItem } from '@renderer/types'
+import type { GroupItem, SiloIcon, TabItem } from '@renderer/types'
 import { useTopbarTabsStore } from './topbar-tabs'
 import { useUiStore } from './ui'
 
 export const useGroupsStore = defineStore('groups', () => {
   const groups = ref<GroupItem[]>([])
   const activeTabId = ref<string | null>(null)
+  // Runtime-only: last tab used in each silo, so switching silos in the rail returns to it
+  const lastTabBySilo = ref<Record<string, string>>({})
+  // False until the saved state has been read — keeps the Welcome screen from flashing on launch
+  const loaded = ref(false)
 
   // --- Getters ---
 
@@ -47,9 +51,7 @@ export const useGroupsStore = defineStore('groups', () => {
   })
 
   const allTabsFlat = computed<TabItem[]>(() =>
-    sortedGroups.value.flatMap((g) =>
-      [...g.tabs].sort((a, b) => a.order - b.order)
-    )
+    sortedGroups.value.flatMap((g) => [...g.tabs].sort((a, b) => a.order - b.order))
   )
 
   // --- Helpers ---
@@ -68,11 +70,12 @@ export const useGroupsStore = defineStore('groups', () => {
 
   // --- Actions ---
 
-  function addGroup(name: string, color: string): GroupItem {
+  function addGroup(name: string, color: string, icon?: SiloIcon): GroupItem {
     const group: GroupItem = {
       id: crypto.randomUUID(),
       name,
       color,
+      icon,
       order: groups.value.length,
       isCollapsed: false,
       tabs: []
@@ -100,7 +103,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function updateGroup(
     groupId: string,
-    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'iconEmoji' | 'userAgent'>>
+    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'icon' | 'userAgent'>>
   ): void {
     const group = findGroup(groupId)
     if (group) {
@@ -150,7 +153,17 @@ export const useGroupsStore = defineStore('groups', () => {
   function updateTab(
     tabId: string,
     updates: Partial<
-      Pick<TabItem, 'name' | 'url' | 'iconUrl' | 'iconEmoji' | 'notificationsEnabled' | 'isMuted' | 'sleepAfterMinutes' | 'userAgent'>
+      Pick<
+        TabItem,
+        | 'name'
+        | 'url'
+        | 'iconUrl'
+        | 'iconEmoji'
+        | 'notificationsEnabled'
+        | 'isMuted'
+        | 'sleepAfterMinutes'
+        | 'userAgent'
+      >
     >
   ): void {
     const tab = findTab(tabId)
@@ -169,9 +182,11 @@ export const useGroupsStore = defineStore('groups', () => {
     const tab = findTab(tabId)
     if (tab) {
       tab.isLoaded = true
+      tab.isAsleep = false
       tab.notificationCount = 0
       tab.lastActiveAt = undefined // active tab never sleeps
       activeTabId.value = tabId
+      lastTabBySilo.value[tab.groupId] = tabId
       useUiStore().closeSettingsPage()
       debouncedSave()
     }
@@ -279,7 +294,7 @@ export const useGroupsStore = defineStore('groups', () => {
           id: rawGroup.id,
           name: rawGroup.name,
           color: rawGroup.color,
-          iconEmoji: rawGroup.iconEmoji,
+          icon: rawGroup.icon ? { ...toRaw(rawGroup.icon) } : undefined,
           userAgent: rawGroup.userAgent,
           order: rawGroup.order,
           isCollapsed: rawGroup.isCollapsed,
@@ -304,11 +319,16 @@ export const useGroupsStore = defineStore('groups', () => {
   }
 
   async function loadFromDisk(preloaded?: unknown): Promise<void> {
-    const state = (preloaded ?? await window.api.getState()) as Record<string, unknown>
+    const state = (preloaded ?? (await window.api.getState())) as Record<string, unknown>
     groups.value = (state.groups ?? []) as GroupItem[]
     activeTabId.value = (state.activeTabId as string | null) ?? null
+    lastTabBySilo.value = {}
     for (const group of groups.value) {
+      // Pre-rework silos stored an emoji in `iconEmoji`
+      if (!group.icon && group.iconEmoji) group.icon = { kind: 'emoji', value: group.iconEmoji }
+      delete group.iconEmoji
       for (const tab of group.tabs) {
+        tab.isAsleep = false
         tab.isLoaded = false
         tab.isAudioPlaying = false
         tab.notificationCount = tab.notificationCount ?? 0
@@ -336,6 +356,7 @@ export const useGroupsStore = defineStore('groups', () => {
         }
       }
     }
+    loaded.value = true
     // Start sleep timer — checks every 60s for tabs that should be put to sleep
     startSleepTimer()
   }
@@ -356,6 +377,7 @@ export const useGroupsStore = defineStore('groups', () => {
             now - tab.lastActiveAt >= tab.sleepAfterMinutes * 60_000
           ) {
             tab.isLoaded = false
+            tab.isAsleep = true
             useTopbarTabsStore().removeAllChildTabs(tab.id)
           }
         }
@@ -363,9 +385,21 @@ export const useGroupsStore = defineStore('groups', () => {
     }, 60_000)
   }
 
+  /** Puts a tab to sleep now (unloads its webview) — same as the idle timer would. */
+  function sleepTab(tabId: string): void {
+    const tab = findTab(tabId)
+    if (!tab || tab.id === activeTabId.value || !tab.isLoaded) return
+    tab.isLoaded = false
+    tab.isAsleep = true
+    useTopbarTabsStore().removeAllChildTabs(tab.id)
+  }
+
   return {
     groups,
     activeTabId,
+    lastTabBySilo,
+    loaded,
+    sleepTab,
     sortedGroups,
     activeTab,
     activeGroup,

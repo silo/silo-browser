@@ -4,6 +4,7 @@ import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
@@ -115,45 +116,49 @@ function handleKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    class="flex items-center gap-2 px-3 py-1.5 bg-surface-chrome border-b border-chrome-border"
+    role="search"
+    class="absolute top-3 right-3 z-30 flex items-center gap-1 rounded-xl bg-panel py-1 pr-1 pl-2.5 shadow-menu"
     @keydown="handleKeydown"
   >
+    <AppIcon name="search" :size="14" :stroke="2.1" class="text-fg3" />
     <input
       ref="inputRef"
       v-model="searchText"
       type="text"
-      placeholder="Find in page..."
-      class="px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary focus:outline-none focus:border-accent-soft w-60"
+      aria-label="Find in page"
+      placeholder="Find in page"
+      class="h-7 w-52 border-0 bg-transparent px-1 text-[13px] text-fg1 outline-none placeholder:text-fg3"
     />
-    <span v-if="searchText" class="text-xs text-chrome-fg-muted whitespace-nowrap">
-      {{ totalMatches > 0 ? `${activeMatchOrdinal} / ${totalMatches}` : 'No matches' }}
+    <span v-if="searchText" class="font-mono text-[11px] whitespace-nowrap text-fg3">
+      {{ totalMatches > 0 ? `${activeMatchOrdinal}/${totalMatches}` : 'No matches' }}
     </span>
+    <span class="mx-1 h-4 w-px bg-line" aria-hidden="true" />
     <button
-      @click="findPrevious"
-      class="p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
+      type="button"
+      class="flex h-7 w-7 items-center justify-center rounded-lg text-fg2 transition-colors hover:bg-hover hover:text-fg1"
+      aria-label="Previous match"
       title="Previous (Shift+Enter)"
+      @click="findPrevious"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
-      </svg>
+      <AppIcon name="chevron" :size="14" :stroke="2.2" class="rotate-180" />
     </button>
     <button
-      @click="findNext"
-      class="p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
+      type="button"
+      class="flex h-7 w-7 items-center justify-center rounded-lg text-fg2 transition-colors hover:bg-hover hover:text-fg1"
+      aria-label="Next match"
       title="Next (Enter)"
+      @click="findNext"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-      </svg>
+      <AppIcon name="chevron" :size="14" :stroke="2.2" />
     </button>
     <button
-      @click="close"
-      class="p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
+      type="button"
+      class="flex h-7 w-7 items-center justify-center rounded-lg text-fg2 transition-colors hover:bg-hover hover:text-fg1"
+      aria-label="Close find bar"
       title="Close (Esc)"
+      @click="close"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-      </svg>
+      <AppIcon name="close" :size="12" :stroke="2.4" />
     </button>
   </div>
 </template>

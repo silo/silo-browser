@@ -1,46 +1,54 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { shortcut } from '@renderer/utils/platform'
+import SiloTile from '@renderer/components/common/SiloTile.vue'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
 
+// Shown when silos exist but no tab is open (e.g. after closing the last tab).
+const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
-const isMac = window.api.platform === 'darwin'
+
+const silo = computed(
+  () =>
+    (uiStore.railSiloId && groupsStore.findGroup(uiStore.railSiloId)) ||
+    groupsStore.sortedGroups[0] ||
+    null
+)
+const otherSilos = computed(() =>
+  groupsStore.sortedGroups.filter((g) => g.id !== silo.value?.id).map((g) => g.name)
+)
+const hasAnyTabs = computed(() => groupsStore.allTabsFlat.length > 0)
 </script>
 
 <template>
-  <div class="absolute inset-0 flex flex-col bg-surface-chrome">
-    <!-- Empty topbar -->
-    <div
-      :class="[
-        'shrink-0 h-10 border-b border-chrome-border',
-        isMac ? 'app-drag' : '',
-        isMac && !uiStore.sidebarExpanded ? 'pl-8' : ''
-      ]"
-    />
-
-    <!-- Content -->
-    <div class="flex-1 flex items-center justify-center text-fg-faint">
-    <div class="text-center">
-      <svg
-        width="128"
-        height="128"
-        viewBox="0 0 128 128"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        class="w-20 h-20 mx-auto mb-6"
+  <div class="absolute inset-0 flex items-center justify-center p-10">
+    <div v-if="silo" class="flex max-w-[420px] flex-col items-center gap-4 text-center">
+      <SiloTile :silo="silo" :size="56" :radius="16" />
+      <div class="flex flex-col gap-2">
+        <h2 class="m-0 font-display text-[24px] font-bold tracking-[-0.02em]">
+          {{ hasAnyTabs ? 'Pick a tab to get going' : `Add your first tab to ${silo.name}` }}
+        </h2>
+        <p class="m-0 text-[13.5px] leading-[1.5] text-fg2">
+          <template v-if="hasAnyTabs">Choose one in the sidebar, or add a new one.</template>
+          <template v-else>
+            Tabs in {{ silo.name }} share its logins.
+            <template v-if="otherSilos.length">
+              Nothing crosses over to {{ otherSilos.join(', ') }}.
+            </template>
+          </template>
+        </p>
+      </div>
+      <button
+        type="button"
+        class="flex h-9 items-center gap-2 rounded-[9px] bg-accent px-4 text-[13px] font-semibold text-on-accent transition-[filter] hover:brightness-110"
+        @click="uiStore.openAddTabDialog(silo.id)"
       >
-        <rect width="128" height="128" rx="50" fill="#14121A" />
-        <path
-          d="M45.648 105.304V93.784H34V80.856H46.928V92.504H80.464V70.488H45.648V58.968H34V34.648H45.648V23H81.744V34.648H93.52V47.448H80.464V35.928H46.928V57.816H81.744V69.208H93.52V93.784H81.744V105.304H45.648Z"
-          fill="white"
-        />
-      </svg>
-      <h1 class="text-2xl font-semibold text-fg-secondary mb-2">Welcome to Silo Browser</h1>
-      <p class="text-base text-fg-muted mb-4">
-        Your web apps, organized and isolated.
-      </p>
-      <p class="text-sm text-fg-faint">
-        Get started by adding a new group and tab in the sidebar.
-      </p>
-    </div>
+        <AppIcon name="plus" :size="13" :stroke="2.4" />
+        Add tab to {{ silo.name }}
+        <kbd class="text-[10.5px] opacity-80">{{ shortcut('T') }}</kbd>
+      </button>
     </div>
   </div>
 </template>

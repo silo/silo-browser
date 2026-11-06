@@ -1,21 +1,18 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
-import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { useWebviewRegistry, type WebviewTag } from '@renderer/composables/useWebviewRegistry'
+import { useAppTheme } from '@renderer/composables/useAppTheme'
 import TheSidebar from '@renderer/components/sidebar/TheSidebar.vue'
+import TheNavigationBar from '@renderer/components/content/TheNavigationBar.vue'
 import TheContentArea from '@renderer/components/content/TheContentArea.vue'
 import ContextMenu from '@renderer/components/ContextMenu.vue'
 
-const AddGroupDialog = defineAsyncComponent(
-  () => import('@renderer/components/dialogs/AddGroupDialog.vue')
-)
+const SiloDialog = defineAsyncComponent(() => import('@renderer/components/dialogs/SiloDialog.vue'))
 const AddTabDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/AddTabDialog.vue')
-)
-const EditGroupDialog = defineAsyncComponent(
-  () => import('@renderer/components/dialogs/EditGroupDialog.vue')
 )
 const EditTabDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/EditTabDialog.vue')
@@ -32,11 +29,38 @@ const UpdateDialog = defineAsyncComponent(
 const DisplayMediaPickerDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/DisplayMediaPickerDialog.vue')
 )
+const CommandBar = defineAsyncComponent(() => import('@renderer/components/CommandBar.vue'))
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
 const webviewRegistry = useWebviewRegistry()
+
+useAppTheme()
+
+/**
+ * The window is one CSS grid so the content area (and its webviews) never changes DOM parent
+ * when the layout changes — moving a <webview> in the DOM would reload it.
+ *   expanded:  sidebar on the left, title row + page on the right
+ *   collapsed: title row across the full width, 60px icon column + page below
+ *   settings:  silo rail + settings page
+ */
+const mode = computed<'expanded' | 'collapsed' | 'settings'>(() => {
+  if (uiStore.settingsPageOpen) return 'settings'
+  if (!uiStore.sidebarExpanded && groupsStore.groups.length > 0) return 'collapsed'
+  return 'expanded'
+})
+
+const gridAreas = computed(() => {
+  switch (mode.value) {
+    case 'collapsed':
+      return '"header header" "side content"'
+    case 'settings':
+      return '"side settings" "side settings"'
+    default:
+      return '"side header" "side content"'
+  }
+})
 
 onMounted(async () => {
   const state = await window.api.getState()
@@ -44,64 +68,30 @@ onMounted(async () => {
   await topbarStore.loadFromDisk(state)
   window.addEventListener('keydown', handleKeydown)
 
-  // Listen for "Open in New Tab" from webview context menu
+  // "Open in New Tab" from the webview context menu
   window.api.onOpenInNewTab((url: string) => {
     const activeTab = groupsStore.activeTab
-    if (activeTab) {
-      topbarStore.addChildTab(activeTab.id, activeTab.groupId, url)
-    }
+    if (activeTab) topbarStore.addChildTab(activeTab.id, activeTab.groupId, url)
   })
 
-  // Listen for auto-updater
-  window.api.onUpdateDownloaded((version: string) => {
-    uiStore.showUpdateDialog(version)
-  })
-
-  // Listen for fallback update (native updater failed, manual download available)
-  window.api.onUpdaterFallbackAvailable((version: string) => {
+  window.api.onUpdateDownloaded((version: string) => uiStore.showUpdateDialog(version))
+  window.api.onUpdaterFallbackAvailable((version: string) =>
     uiStore.showFallbackUpdateDialog(version)
-  })
-
-  // Listen for up-to-date confirmation
-  window.api.onUpdaterUpToDate(() => {
-    uiStore.setUpdaterUpToDate()
-  })
-
-  // Listen for permission requests from webview sessions
-  window.api.onPermissionRequest((data) => {
-    uiStore.showPermissionRequest(data)
-  })
-
+  )
+  window.api.onUpdaterUpToDate(() => uiStore.setUpdaterUpToDate())
+  window.api.onPermissionRequest((data) => uiStore.showPermissionRequest(data))
   // Screen sharing source picker (when the native system picker isn't available)
-  window.api.onDisplayMediaPick((data) => {
-    uiStore.showDisplayMediaPick(data)
-  })
+  window.api.onDisplayMediaPick((data) => uiStore.showDisplayMediaPick(data))
 
-  // Listen for menu shortcuts from main process
-  window.api.onCloseTab(() => {
-    handleCloseTab()
-  })
-  window.api.onNewGroup(() => {
-    uiStore.openAddGroupDialog()
-  })
-  window.api.onOpenSettings(() => {
-    if (uiStore.settingsPageOpen) {
-      uiStore.closeSettingsPage()
-    } else {
-      uiStore.openSettingsPage()
-    }
-  })
-  window.api.onReloadTab(() => {
-    const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
-    wv?.reload()
-  })
-
-  // Find shortcut
-  window.api.onFind(() => {
-    uiStore.openFindBar()
-  })
-
-  // Zoom shortcuts
+  // Menu accelerators from the main process (these also fire while a page has focus)
+  window.api.onCloseTab(() => handleCloseTab())
+  window.api.onNewTab(() => openAddTabForCurrentSilo())
+  window.api.onNewGroup(() => uiStore.openAddGroupDialog())
+  window.api.onCommandBar(() => openCommandBar())
+  window.api.onGoToTab((index: number) => goToTab(index))
+  window.api.onOpenSettings(() => toggleSettings())
+  window.api.onReloadTab(() => getActiveWebview()?.reload())
+  window.api.onFind(() => uiStore.openFindBar())
   window.api.onZoomIn(() => applyZoom(0.5))
   window.api.onZoomOut(() => applyZoom(-0.5))
   window.api.onZoomReset(() => applyZoom(0, true))
@@ -114,7 +104,10 @@ onUnmounted(() => {
   window.api.removeUpdaterFallbackAvailableListener()
   window.api.removeUpdaterUpToDateListener()
   window.api.removeCloseTabListener()
+  window.api.removeNewTabListener()
   window.api.removeNewGroupListener()
+  window.api.removeCommandBarListener()
+  window.api.removeGoToTabListener()
   window.api.removeOpenSettingsListener()
   window.api.removeReloadTabListener()
   window.api.removeZoomInListener()
@@ -125,12 +118,41 @@ onUnmounted(() => {
   window.api.removeFindListener()
 })
 
+function getActiveWebview(): WebviewTag | null {
+  return webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+}
+
 function applyZoom(delta: number, reset = false): void {
-  const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
+  const wv = getActiveWebview()
   if (!wv) return
   const newLevel = reset ? 0 : wv.getZoomLevel() + delta
   wv.setZoomLevel(newLevel)
   if (groupsStore.activeTabId) groupsStore.setTabZoomLevel(groupsStore.activeTabId, newLevel)
+}
+
+function toggleSettings(): void {
+  if (uiStore.settingsPageOpen) uiStore.closeSettingsPage()
+  else uiStore.openSettingsPage()
+}
+
+/** ⌘T adds a tab to the silo you're in (the rail's selected silo, else the active tab's). */
+function openAddTabForCurrentSilo(): void {
+  const target =
+    (uiStore.railSiloId && groupsStore.findGroup(uiStore.railSiloId)) ||
+    groupsStore.activeGroup ||
+    groupsStore.sortedGroups[0]
+  if (target) uiStore.openAddTabDialog(target.id)
+}
+
+// Open-only (never toggles): the menu accelerator and the keydown fallback may both fire
+function openCommandBar(): void {
+  if (groupsStore.groups.length === 0) return
+  uiStore.openCommandBar()
+}
+
+function goToTab(index: number): void {
+  const tab = groupsStore.allTabsFlat[index]
+  if (tab) groupsStore.activateTab(tab.id)
 }
 
 function handleCloseTab(): void {
@@ -145,113 +167,110 @@ function handleCloseTab(): void {
   }
 }
 
+// Fallback for when the app chrome (not a page) has focus. Shortcuts that also exist as menu
+// accelerators are handled by the menu first; the handlers are idempotent either way.
 function handleKeydown(e: KeyboardEvent): void {
   const mod = e.metaKey || e.ctrlKey
 
-  // Ctrl/Cmd+A — select all within active webview, not the whole app
+  // Ctrl/Cmd+A — select all within the active page, not the whole app
   if (mod && e.key === 'a') {
     const active = document.activeElement
     if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) {
       e.preventDefault()
-      const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
-      if (wv) wv.selectAll()
+      getActiveWebview()?.selectAll()
     }
     return
   }
 
-  // Ctrl/Cmd+T — open add tab dialog for first group
   if (mod && e.key === 't') {
     e.preventDefault()
-    const firstGroup = groupsStore.sortedGroups[0]
-    if (firstGroup) uiStore.openAddTabDialog(firstGroup.id)
+    openAddTabForCurrentSilo()
     return
   }
 
-  // Ctrl/Cmd+N — new group
   if (mod && e.key === 'n') {
     e.preventDefault()
     uiStore.openAddGroupDialog()
     return
   }
 
-  // Ctrl/Cmd+R — reload active webview (child or main)
   if (mod && e.key === 'r') {
     e.preventDefault()
-    const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
-    wv?.reload()
+    getActiveWebview()?.reload()
     return
   }
 
-  // Ctrl/Cmd+F — find in page
   if (mod && e.key === 'f') {
     e.preventDefault()
     uiStore.openFindBar()
     return
   }
 
-  // Ctrl/Cmd+L — open URL bar
   if (mod && e.key === 'l') {
     e.preventDefault()
-    uiStore.openUrlBar()
+    openCommandBar()
     return
   }
 
-  // Ctrl/Cmd+, — toggle settings
   if (mod && e.key === ',') {
     e.preventDefault()
-    if (uiStore.settingsPageOpen) {
-      uiStore.closeSettingsPage()
-    } else {
-      uiStore.openSettingsPage()
-    }
+    toggleSettings()
     return
   }
 
-  // Ctrl/Cmd+[ or ] — sidebar toggle
   if (mod && (e.key === '[' || e.key === ']')) {
     e.preventDefault()
     uiStore.toggleSidebar()
     return
   }
 
-  // Ctrl/Cmd+1-9 — switch to Nth loaded tab
   if (mod && e.key >= '1' && e.key <= '9') {
     e.preventDefault()
-    const allTabs = groupsStore.allTabsFlat
-    const idx = parseInt(e.key) - 1
-    if (idx < allTabs.length) {
-      groupsStore.activateTab(allTabs[idx].id)
-    }
+    goToTab(parseInt(e.key) - 1)
     return
   }
 
-  // Escape — close topmost layer first
+  // Escape — close the topmost layer first
   if (e.key === 'Escape') {
-    if (uiStore.contextMenuVisible) { uiStore.hideContextMenu(); return }
-    if (uiStore.displayMediaPick) { uiStore.respondToDisplayMediaPick(null); return }
-    if (uiStore.addGroupDialogOpen) { uiStore.closeAddGroupDialog(); return }
-    if (uiStore.addTabDialogOpen) { uiStore.closeAddTabDialog(); return }
-    if (uiStore.editGroupDialogOpen) { uiStore.closeEditGroupDialog(); return }
-    if (uiStore.editTabDialogOpen) { uiStore.closeEditTabDialog(); return }
-    if (uiStore.confirmRemoveTabDialogOpen) { uiStore.closeConfirmRemoveTabDialog(); return }
-    if (uiStore.updateDialogOpen) { uiStore.closeUpdateDialog(); return }
-    if (uiStore.findBarOpen) { uiStore.closeFindBar(); return }
-    if (uiStore.urlBarOpen) { uiStore.closeUrlBar(); return }
-    if (uiStore.settingsPageOpen) { uiStore.closeSettingsPage(); return }
+    if (uiStore.contextMenuVisible) return uiStore.hideContextMenu()
+    if (uiStore.displayMediaPick) return uiStore.respondToDisplayMediaPick(null)
+    if (uiStore.commandBarOpen) return uiStore.closeCommandBar()
+    if (uiStore.addGroupDialogOpen) return uiStore.closeAddGroupDialog()
+    if (uiStore.addTabDialogOpen) return uiStore.closeAddTabDialog()
+    if (uiStore.editGroupDialogOpen) return uiStore.closeEditGroupDialog()
+    if (uiStore.editTabDialogOpen) return uiStore.closeEditTabDialog()
+    if (uiStore.confirmRemoveTabDialogOpen) return uiStore.closeConfirmRemoveTabDialog()
+    if (uiStore.updateDialogOpen) return uiStore.closeUpdateDialog()
+    if (uiStore.findBarOpen) return uiStore.closeFindBar()
+    if (uiStore.settingsPageOpen) return uiStore.closeSettingsPage()
   }
 }
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-surface-base text-fg-primary">
-    <TheSidebar />
-    <SettingsPage v-if="uiStore.settingsPageOpen" />
-    <TheContentArea v-show="!uiStore.settingsPageOpen" />
+  <div
+    class="chrome-transition grid h-screen w-screen overflow-hidden bg-chrome text-fg1"
+    :style="{
+      gridTemplateColumns: 'auto minmax(0, 1fr)',
+      gridTemplateRows: '44px minmax(0, 1fr)',
+      gridTemplateAreas: gridAreas
+    }"
+  >
+    <div class="min-h-0" style="grid-area: side">
+      <TheSidebar />
+    </div>
+    <TheNavigationBar
+      v-show="mode !== 'settings'"
+      :full-width="mode === 'collapsed'"
+      style="grid-area: header"
+    />
+    <TheContentArea v-show="mode !== 'settings'" style="grid-area: content" />
+    <SettingsPage v-if="mode === 'settings'" style="grid-area: settings" />
   </div>
   <ContextMenu />
-  <AddGroupDialog v-if="uiStore.addGroupDialogOpen" />
+  <CommandBar v-if="uiStore.commandBarOpen" />
+  <SiloDialog v-if="uiStore.addGroupDialogOpen || uiStore.editGroupDialogOpen" />
   <AddTabDialog v-if="uiStore.addTabDialogOpen" />
-  <EditGroupDialog v-if="uiStore.editGroupDialogOpen" />
   <EditTabDialog v-if="uiStore.editTabDialogOpen" />
   <ConfirmRemoveTabDialog v-if="uiStore.confirmRemoveTabDialogOpen" />
   <UpdateDialog v-if="uiStore.updateDialogOpen" />

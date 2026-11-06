@@ -1,45 +1,79 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
-import type { AccentColor, SurfaceColor } from '@renderer/types'
+import { ACCENTS, DARK_SHADES, LIGHT_SHADES, TINTS, mixHex } from '@renderer/utils/theme'
+import { isMac, shortcut } from '@renderer/utils/platform'
+import type { SidebarLayout, ThemeMode } from '@renderer/types'
 import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
+import SiloTile from '@renderer/components/common/SiloTile.vue'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
 
+// Design board "C · Settings": cards for look & feel, behaviour, silos, backup and shortcuts.
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
-const isMac = window.api.platform === 'darwin'
+
 const appVersion = ref('')
 const checkingForUpdates = ref(false)
-
-const accentPresets: { name: AccentColor; hex: string }[] = [
-  { name: 'gray', hex: '#6b7280' },
-  { name: 'red', hex: '#ef4444' },
-  { name: 'orange', hex: '#f97316' },
-  { name: 'amber', hex: '#f59e0b' },
-  { name: 'green', hex: '#10b981' },
-  { name: 'cyan', hex: '#06b6d4' },
-  { name: 'blue', hex: '#3b82f6' },
-  { name: 'violet', hex: '#8b5cf6' },
-  { name: 'pink', hex: '#ec4899' }
-]
-
-const surfacePresets: { name: SurfaceColor; swatch: string }[] = [
-  { name: 'charcoal', swatch: '#141414' },
-  { name: 'neutral', swatch: '#1f2937' },
-  { name: 'wine', swatch: '#e11d48' },
-  { name: 'earth', swatch: '#f59e0b' },
-  { name: 'forest', swatch: '#22c55e' },
-  { name: 'teal', swatch: '#14b8a6' },
-  { name: 'slate', swatch: '#64748b' },
-  { name: 'navy', swatch: '#6366f1' },
-  { name: 'plum', swatch: '#a855f7' }
-]
 
 onMounted(async () => {
   appVersion.value = await window.api.getAppVersion()
 })
+
+// --- Look & feel ---
+
+const lightHex = computed(() => LIGHT_SHADES.find((s) => s.id === uiStore.lightShade)!.hex)
+const darkHex = computed(() => DARK_SHADES.find((s) => s.id === uiStore.darkShade)!.hex)
+
+/** Mini window previews for the theme cards, drawn in the user's chosen shades. */
+const themes = computed(() => {
+  const light = { panel: lightHex.value, line: 'rgba(0,0,0,.14)', active: '#FFFFFF', page: '#FFFFFF' }
+  const dark = {
+    panel: darkHex.value,
+    line: 'rgba(255,255,255,.2)',
+    active: 'rgba(255,255,255,.14)',
+    page: mixHex('#FFFFFF', 6, darkHex.value)
+  }
+  const half = (a: string, b: string): string => `linear-gradient(90deg, ${a} 50%, ${b} 50%)`
+  return [
+    { id: 'light' as ThemeMode, label: 'Light', ...light },
+    { id: 'dark' as ThemeMode, label: 'Dark', ...dark },
+    {
+      id: 'system' as ThemeMode,
+      label: 'Match system',
+      panel: half(light.panel, dark.panel),
+      line: 'rgba(127,127,127,.35)',
+      active: 'rgba(127,127,127,.3)',
+      page: half(light.page, dark.page)
+    }
+  ]
+})
+
+const lightLabel = computed(() => {
+  const name = LIGHT_SHADES.find((s) => s.id === uiStore.lightShade)!.name
+  return uiStore.effectiveTheme === 'light' ? `${name} · in use` : name
+})
+const darkLabel = computed(() => {
+  const name = DARK_SHADES.find((s) => s.id === uiStore.darkShade)!.name
+  return uiStore.effectiveTheme === 'dark' ? `${name} · in use` : name
+})
+
+const LAYOUTS: { id: SidebarLayout; label: string }[] = [
+  { id: 'sidebar', label: 'One sidebar' },
+  { id: 'rail', label: 'Rail + list' }
+]
+
+const selectedRing = '0 0 0 2px var(--card), 0 0 0 4px var(--fg1)'
+
+// --- Silos ---
+
+function siloMeta(tabs: number, ua?: string): string {
+  return `${tabs} ${tabs === 1 ? 'tab' : 'tabs'} · ${ua ? 'custom user agent' : 'default user agent'}`
+}
+
+// --- Backup & updates ---
 
 function handleCheckForUpdates(): void {
   checkingForUpdates.value = true
@@ -64,366 +98,431 @@ async function handleExport(): Promise<void> {
   await window.api.exportConfig()
 }
 
-const mod = isMac ? '\u2318' : 'Ctrl'
-
-const shortcuts: { keys: string; description: string }[] = [
-  { keys: `${mod}+T`, description: 'New tab' },
-  { keys: `${mod}+N`, description: 'New group' },
-  { keys: `${mod}+W`, description: 'Close active child tab' },
-  { keys: `${mod}+R`, description: 'Reload active tab' },
-  { keys: `${mod}+F`, description: 'Find in page' },
-  { keys: `${mod}+L`, description: 'Focus URL bar' },
-  { keys: `${mod}+,`, description: 'Toggle settings' },
-  { keys: `${mod}+[ / ]`, description: 'Toggle sidebar' },
-  { keys: `${mod}+=`, description: 'Zoom in' },
-  { keys: `${mod}+-`, description: 'Zoom out' },
-  { keys: `${mod}+0`, description: 'Reset zoom' },
-  { keys: `${mod}+1-9`, description: 'Switch to Nth tab' },
-  { keys: 'Esc', description: 'Close dialogs / settings' }
-]
-
-const isCustomSurfaceColor = computed(() => uiStore.surfaceColor.startsWith('#'))
-
 function openWebsite(): void {
   window.api.openExternal('https://silo.dev')
 }
 
-function onCustomSurfaceColor(event: Event): void {
-  const hex = (event.target as HTMLInputElement).value
-  uiStore.setSurfaceColor(hex)
-}
+// --- Shortcuts ---
+
+const shortcuts = [
+  { label: 'New tab', keys: shortcut('T') },
+  { label: 'New silo', keys: shortcut('N') },
+  { label: 'Close pop-up tab', keys: shortcut('W') },
+  { label: 'Reload', keys: shortcut('R') },
+  { label: 'Address & search', keys: shortcut('L') },
+  { label: 'Find in page', keys: shortcut('F') },
+  { label: 'Settings', keys: shortcut(',') },
+  { label: 'Toggle sidebar', keys: isMac ? '⌘[ ⌘]' : 'Ctrl+[ ]' },
+  { label: 'Go to tab 1–9', keys: shortcut('1–9') },
+  { label: 'Zoom in / out', keys: isMac ? '⌘+ ⌘−' : 'Ctrl+ +/−' },
+  { label: 'Actual size', keys: shortcut('0') },
+  { label: 'Close dialog or settings', keys: 'Esc' }
+]
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col min-w-0 bg-surface-chrome">
-    <!-- Header bar -->
-    <div
-      :class="[
-        'flex items-center gap-2 pr-2 py-1.5 bg-surface-chrome border-b border-chrome-border',
-        isMac ? 'app-drag' : '',
-        isMac && !uiStore.sidebarExpanded ? 'pl-8' : 'pl-2'
-      ]"
-    >
-      <button
-        @click="uiStore.closeSettingsPage()"
-        class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
-        title="Back to browser"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-          <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
-        </svg>
-      </button>
-      <h1 class="app-no-drag text-sm font-medium text-chrome-fg-primary">Settings</h1>
-    </div>
+  <main class="flex min-h-0 min-w-0 flex-col">
+    <div aria-hidden="true" class="app-drag h-11 shrink-0" />
+    <div class="thin-scroll min-h-0 flex-1 overflow-y-auto">
+      <div class="mx-auto flex max-w-[1064px] flex-col gap-5 px-8 pb-12">
+        <header class="flex flex-wrap items-end gap-3">
+          <div class="flex flex-col gap-1">
+            <h1 class="m-0 font-display text-[32px] leading-none font-bold tracking-[-0.03em]">
+              Settings
+            </h1>
+            <span class="text-[13px] text-fg2">Silo v{{ appVersion }}</span>
+          </div>
+          <button type="button" class="btn btn-outline ml-auto" @click="uiStore.closeSettingsPage()">
+            Back to browser
+            <kbd class="text-[10.5px] text-fg3">Esc</kbd>
+          </button>
+        </header>
 
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto text-chrome-fg-secondary">
-      <div class="max-w-xl mx-auto py-8 px-6 space-y-8">
-        <!-- Appearance section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
+        <div class="grid items-start gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr))]">
+          <!-- Look & feel -->
+          <section
+            aria-labelledby="h-look"
+            class="flex flex-col gap-4 rounded-2xl bg-card px-5 pt-[18px] pb-5 shadow-[0_0_0_1px_var(--card-line)]"
           >
-            Appearance
-          </h3>
-          <div class="space-y-4">
-            <!-- Theme mode selector -->
-            <div>
-              <label class="block text-sm text-chrome-fg-muted mb-2">Theme</label>
+            <h2 id="h-look" class="m-0 font-display text-[17px] font-bold tracking-[-0.01em]">
+              Look &amp; feel
+            </h2>
+            <div role="radiogroup" aria-label="Theme" class="grid grid-cols-3 gap-2">
+              <button
+                v-for="t in themes"
+                :key="t.id"
+                type="button"
+                role="radio"
+                :aria-checked="uiStore.themeMode === t.id"
+                class="flex flex-col gap-1.5 text-left"
+                @click="uiStore.setThemeMode(t.id)"
+              >
+                <span
+                  aria-hidden="true"
+                  class="box-border flex h-[60px] w-full gap-[5px] rounded-[10px] p-1.5 transition-shadow"
+                  :style="{
+                    background: t.panel,
+                    boxShadow:
+                      uiStore.themeMode === t.id
+                        ? '0 0 0 2px var(--accent)'
+                        : '0 0 0 1px var(--card-line)'
+                  }"
+                >
+                  <span class="flex w-[30px] flex-col gap-1 pt-0.5">
+                    <span class="flex items-center gap-[3px]">
+                      <span class="h-1.5 w-1.5 rounded-[2px] bg-[#2F63D8]" />
+                      <span class="h-1 flex-1 rounded-sm" :style="{ background: t.line }" />
+                    </span>
+                    <span class="h-[7px] rounded-[3px]" :style="{ background: t.active }" />
+                    <span class="mr-1 ml-0.5 h-1 rounded-sm" :style="{ background: t.line }" />
+                    <span class="mt-0.5 flex items-center gap-[3px]">
+                      <span class="h-1.5 w-1.5 rounded-[2px] bg-[#187A47]" />
+                      <span class="h-1 flex-1 rounded-sm" :style="{ background: t.line }" />
+                    </span>
+                  </span>
+                  <span class="flex-1 rounded-[5px]" :style="{ background: t.page }" />
+                </span>
+                <span
+                  class="text-[12.5px]"
+                  :class="uiStore.themeMode === t.id ? 'font-semibold text-fg1' : 'font-medium text-fg2'"
+                >
+                  {{ t.label }}
+                </span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-[1_1_160px] flex-col gap-0.5">
+                <span id="l-lshade" class="text-[13px] font-semibold">Light shade</span>
+                <span class="text-[12px] text-fg2">{{ lightLabel }}</span>
+              </div>
+              <div role="radiogroup" aria-labelledby="l-lshade" class="flex flex-wrap gap-2">
+                <button
+                  v-for="x in LIGHT_SHADES"
+                  :key="x.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="uiStore.lightShade === x.id"
+                  :aria-label="x.name"
+                  :title="`${x.name} — ${x.note}`"
+                  class="h-[30px] w-[30px] rounded-[9px] transition-shadow"
+                  :style="{
+                    background: x.hex,
+                    boxShadow:
+                      uiStore.lightShade === x.id ? selectedRing : 'inset 0 0 0 1px var(--field-line)'
+                  }"
+                  @click="uiStore.setLightShade(x.id)"
+                />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-[1_1_160px] flex-col gap-0.5">
+                <span id="l-dshade" class="text-[13px] font-semibold">Dark shade</span>
+                <span class="text-[12px] text-fg2">{{ darkLabel }}</span>
+              </div>
+              <div role="radiogroup" aria-labelledby="l-dshade" class="flex flex-wrap gap-2">
+                <button
+                  v-for="x in DARK_SHADES"
+                  :key="x.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="uiStore.darkShade === x.id"
+                  :aria-label="x.name"
+                  :title="`${x.name} — ${x.note}`"
+                  class="h-[30px] w-[30px] rounded-[9px] transition-shadow"
+                  :style="{
+                    background: x.hex,
+                    boxShadow:
+                      uiStore.darkShade === x.id ? selectedRing : 'inset 0 0 0 1px var(--field-line)'
+                  }"
+                  @click="uiStore.setDarkShade(x.id)"
+                />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-[1_1_160px] flex-col gap-0.5">
+                <span id="l-tint" class="text-[13px] font-semibold">Silo tint</span>
+                <span class="text-[12px] text-fg2">Window takes the active silo’s color</span>
+              </div>
               <div
-                class="flex bg-chrome-hover/50 border border-chrome-border rounded overflow-hidden"
+                role="radiogroup"
+                aria-labelledby="l-tint"
+                class="flex gap-0.5 rounded-[9px] bg-field p-[3px] shadow-[inset_0_0_0_1px_var(--field-line)]"
               >
                 <button
-                  v-for="mode in (['dark', 'light', 'system'] as const)"
-                  :key="mode"
-                  @click="uiStore.setThemeMode(mode)"
-                  :class="[
-                    'flex-1 py-2 text-sm capitalize transition-colors',
-                    uiStore.themeMode === mode
-                      ? 'bg-accent text-white'
-                      : 'text-chrome-fg-muted hover:text-chrome-fg-primary hover:bg-chrome-hover'
-                  ]"
+                  v-for="u in TINTS"
+                  :key="u.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="uiStore.siloTint === u.id"
+                  class="h-[26px] rounded-[7px] px-3 text-[12.5px] font-medium transition-colors"
+                  :class="
+                    uiStore.siloTint === u.id
+                      ? 'bg-card text-fg1 shadow-[0_1px_2px_rgba(0,0,0,.14),0_0_0_1px_var(--card-line)]'
+                      : 'text-fg2 hover:text-fg1'
+                  "
+                  @click="uiStore.setSiloTint(u.id)"
                 >
-                  {{ mode }}
+                  {{ u.name }}
                 </button>
               </div>
             </div>
 
-            <!-- Accent color picker -->
-            <div>
-              <label class="block text-sm text-chrome-fg-muted mb-2">Accent Color</label>
-              <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-3">
+              <span id="l-accent" class="flex-[1_1_160px] text-[13px] font-semibold">Accent</span>
+              <div role="radiogroup" aria-labelledby="l-accent" class="flex flex-wrap gap-2">
                 <button
-                  v-for="preset in accentPresets"
-                  :key="preset.name"
-                  class="w-7 h-7 rounded-full border-2 transition-all cursor-pointer"
-                  :class="
-                    uiStore.accentColor === preset.name
-                      ? 'border-fg-primary scale-110'
-                      : 'border-transparent'
-                  "
-                  :style="{ backgroundColor: preset.hex }"
-                  :title="preset.name"
-                  @click="uiStore.setAccentColor(preset.name)"
+                  v-for="a in ACCENTS"
+                  :key="a.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="uiStore.accentColor === a.id"
+                  :aria-label="a.name"
+                  :title="a.name"
+                  class="h-[22px] w-[22px] rounded-full transition-shadow"
+                  :style="{
+                    background: a.swatch,
+                    boxShadow:
+                      uiStore.accentColor === a.id
+                        ? selectedRing
+                        : a.id === 'black'
+                          ? 'inset 0 0 0 1px var(--field-line)'
+                          : 'none'
+                  }"
+                  @click="uiStore.setAccentColor(a.id)"
                 />
               </div>
             </div>
 
-            <!-- Surface color picker -->
-            <div>
-              <label class="block text-sm text-chrome-fg-muted mb-1">Surface Color</label>
-              <p class="text-xs text-chrome-fg-faint mb-2">Tint for sidebar and navigation bar</p>
-              <div class="flex gap-2">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-[1_1_160px] flex-col gap-0.5">
+                <span id="l-layout" class="text-[13px] font-semibold">Sidebar layout</span>
+                <span class="text-[12px] text-fg2">
+                  {{
+                    uiStore.sidebarLayout === 'rail'
+                      ? 'Silo rail, with one silo’s tabs at a time'
+                      : 'Every silo and its tabs in one list'
+                  }}
+                </span>
+              </div>
+              <div
+                role="radiogroup"
+                aria-labelledby="l-layout"
+                class="flex gap-0.5 rounded-[9px] bg-field p-[3px] shadow-[inset_0_0_0_1px_var(--field-line)]"
+              >
                 <button
-                  v-for="preset in surfacePresets"
-                  :key="preset.name"
-                  class="w-7 h-7 rounded-full border-2 transition-all cursor-pointer"
+                  v-for="l in LAYOUTS"
+                  :key="l.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="uiStore.sidebarLayout === l.id"
+                  class="h-[26px] rounded-[7px] px-3 text-[12.5px] font-medium transition-colors"
                   :class="
-                    uiStore.surfaceColor === preset.name
-                      ? 'border-fg-primary scale-110'
-                      : 'border-transparent'
+                    uiStore.sidebarLayout === l.id
+                      ? 'bg-card text-fg1 shadow-[0_1px_2px_rgba(0,0,0,.14),0_0_0_1px_var(--card-line)]'
+                      : 'text-fg2 hover:text-fg1'
                   "
-                  :style="{ backgroundColor: preset.swatch }"
-                  :title="preset.name"
-                  @click="uiStore.setSurfaceColor(preset.name)"
-                />
-
-                <!-- Custom color picker -->
-                <label
-                  class="w-7 h-7 rounded-full border-2 transition-all cursor-pointer relative overflow-hidden"
-                  :class="
-                    isCustomSurfaceColor
-                      ? 'border-fg-primary scale-110'
-                      : 'border-transparent'
-                  "
-                  :style="isCustomSurfaceColor ? { backgroundColor: uiStore.surfaceColor } : {}"
-                  title="Custom color"
+                  @click="uiStore.setSidebarLayout(l.id)"
                 >
-                  <input
-                    type="color"
-                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    :value="isCustomSurfaceColor ? uiStore.surfaceColor : '#1f2937'"
-                    @input="onCustomSurfaceColor"
-                  />
-                  <span
-                    v-if="!isCustomSurfaceColor"
-                    class="flex items-center justify-center w-full h-full rounded-full bg-chrome-hover text-chrome-fg-faint"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                      <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-                    </svg>
-                  </span>
-                </label>
+                  {{ l.label }}
+                </button>
               </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <!-- General section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
+          <!-- Behaviour -->
+          <section
+            aria-labelledby="h-behave"
+            class="flex flex-col rounded-2xl bg-card px-5 pt-[18px] pb-3 shadow-[0_0_0_1px_var(--card-line)]"
           >
-            General
-          </h3>
-          <div class="space-y-3">
-            <label
-              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded cursor-pointer hover:border-accent transition-colors"
-            >
-              <div>
-                <span class="text-sm text-chrome-fg-secondary">Open links in new tab</span>
-                <p class="text-xs text-chrome-fg-faint mt-0.5">
-                  Links that open new windows will open as topbar tabs instead
-                </p>
+            <h2 id="h-behave" class="m-0 mb-1.5 font-display text-[17px] font-bold tracking-[-0.01em]">
+              Behaviour
+            </h2>
+            <div class="flex items-center gap-3.5 border-b border-row-line py-2.5">
+              <div class="flex flex-1 flex-col gap-0.5">
+                <span id="l-links" class="text-[13px] font-semibold">Keep new windows inside Silo</span>
+                <span class="text-[12px] text-fg2">
+                  Pop-ups open as tabs above the page, with the same login
+                </span>
               </div>
-              <input
-                type="checkbox"
-                :checked="uiStore.openLinksInNewTab"
-                @change="uiStore.setOpenLinksInNewTab(($event.target as HTMLInputElement).checked)"
-                class="w-4 h-4 cursor-pointer"
+              <button
+                type="button"
+                role="switch"
+                class="switch"
+                aria-labelledby="l-links"
+                :aria-checked="uiStore.openLinksInNewTab"
+                @click="uiStore.setOpenLinksInNewTab(!uiStore.openLinksInNewTab)"
               />
-            </label>
-
-            <label
-              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-accent transition-colors"
-            >
-              <div>
-                <span class="text-sm text-chrome-fg-secondary">Auto-sleep for new tabs</span>
-                <p class="text-xs text-chrome-fg-faint mt-0.5">
-                  Automatically suspend inactive tabs to save memory
-                </p>
+            </div>
+            <div class="flex items-center gap-3.5 border-b border-row-line py-2.5">
+              <div class="flex flex-1 flex-col gap-0.5">
+                <span id="l-confirm" class="text-[13px] font-semibold">
+                  Confirm before closing pop-up tabs
+                </span>
+                <span class="text-[12px] text-fg2">Ask before {{ shortcut('W') }} closes one</span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                class="switch"
+                aria-labelledby="l-confirm"
+                :aria-checked="uiStore.confirmCloseChildTabs"
+                @click="uiStore.setConfirmCloseChildTabs(!uiStore.confirmCloseChildTabs)"
+              />
+            </div>
+            <div class="flex items-center gap-3.5 border-b border-row-line py-2.5">
+              <div class="flex flex-1 flex-col gap-0.5">
+                <label for="c-sleep" class="text-[13px] font-semibold">Put idle tabs to sleep</label>
+                <span class="text-[12px] text-fg2">For new tabs — each tab can change it</span>
               </div>
               <select
+                id="c-sleep"
+                class="select-field"
                 :value="uiStore.defaultSleepAfterMinutes"
-                @change="uiStore.setDefaultSleepAfterMinutes(Number(($event.target as HTMLSelectElement).value))"
-                class="px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary cursor-pointer focus:outline-none focus:border-accent"
+                @change="
+                  uiStore.setDefaultSleepAfterMinutes(
+                    Number(($event.target as HTMLSelectElement).value)
+                  )
+                "
               >
                 <option :value="0">Never</option>
-                <option :value="30">30 min</option>
-                <option :value="60">1 hour</option>
-                <option :value="120">2 hours</option>
-                <option :value="240">4 hours</option>
+                <option :value="30">After 30 min</option>
+                <option :value="60">After 1 hour</option>
+                <option :value="120">After 2 hours</option>
+                <option :value="240">After 4 hours</option>
               </select>
-            </label>
-
-            <label
-              class="flex items-center justify-between px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded cursor-pointer hover:border-accent transition-colors"
-            >
-              <div>
-                <span class="text-sm text-chrome-fg-secondary">Confirm before closing child tabs</span>
-                <p class="text-xs text-chrome-fg-faint mt-0.5">
-                  Show a confirmation dialog when closing topbar tabs
-                </p>
+            </div>
+            <div class="flex items-start gap-3.5 py-2.5">
+              <div class="flex flex-1 flex-col gap-0.5 pt-1">
+                <span class="text-[13px] font-semibold">Default user agent</span>
+                <span class="text-[12px] text-fg2">Silos and tabs can override it</span>
               </div>
-              <input
-                type="checkbox"
-                :checked="uiStore.confirmCloseChildTabs"
-                @change="uiStore.setConfirmCloseChildTabs(($event.target as HTMLInputElement).checked)"
-                class="w-4 h-4 cursor-pointer"
+              <UserAgentSelector
+                :model-value="uiStore.defaultUserAgent"
+                default-label="Automatic"
+                @update:model-value="uiStore.setDefaultUserAgent"
               />
-            </label>
+            </div>
+          </section>
 
+          <!-- Silos -->
+          <section
+            aria-labelledby="h-silos"
+            class="flex flex-col rounded-2xl bg-card px-5 pt-[18px] pb-3 shadow-[0_0_0_1px_var(--card-line)]"
+          >
+            <div class="mb-1.5 flex items-center">
+              <h2 id="h-silos" class="m-0 flex-1 font-display text-[17px] font-bold tracking-[-0.01em]">
+                Silos
+              </h2>
+              <button type="button" class="btn btn-ghost btn-sm" @click="uiStore.openAddGroupDialog()">
+                <AppIcon name="plus" :size="12" :stroke="2.5" />
+                New silo
+              </button>
+            </div>
             <div
-              class="flex flex-col gap-2 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-accent transition-colors"
+              v-for="s in groupsStore.sortedGroups"
+              :key="s.id"
+              class="flex items-center gap-3 border-b border-row-line py-2 last:border-b-0"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <span class="text-sm text-chrome-fg-secondary">Default user agent</span>
-                  <p class="text-xs text-chrome-fg-faint mt-0.5">
-                    Used by all groups unless overridden. Takes effect on next reload.
-                  </p>
-                </div>
-                <UserAgentSelector
-                  :model-value="uiStore.defaultUserAgent"
-                  @update:model-value="uiStore.setDefaultUserAgent"
-                  variant="chrome"
-                  default-label="Default (auto)"
-                />
+              <SiloTile :silo="s" :size="28" :radius="8" />
+              <span class="flex min-w-0 flex-1 items-baseline gap-2">
+                <span class="truncate text-[13.5px] font-semibold">{{ s.name }}</span>
+                <span class="truncate text-[12px] text-fg2">{{ siloMeta(s.tabs.length, s.userAgent) }}</span>
+              </span>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm h-[26px]"
+                :aria-label="`Edit ${s.name}`"
+                @click="uiStore.openEditGroupDialog(s.id)"
+              >
+                Edit
+              </button>
+            </div>
+            <p v-if="groupsStore.groups.length === 0" class="m-0 py-2 text-[12.5px] text-fg3">
+              No silos yet.
+            </p>
+          </section>
+
+          <!-- Backup & updates -->
+          <section
+            aria-labelledby="h-backup"
+            class="flex flex-col gap-3 rounded-2xl bg-card px-5 pt-[18px] pb-5 shadow-[0_0_0_1px_var(--card-line)]"
+          >
+            <h2 id="h-backup" class="m-0 font-display text-[17px] font-bold tracking-[-0.01em]">
+              Backup &amp; updates
+            </h2>
+            <div class="flex flex-col gap-2 rounded-[10px] bg-field p-3">
+              <span class="text-[13px] font-semibold">Configuration file</span>
+              <span class="text-[12px] text-fg2">
+                Silos, tabs and settings as a JSON file. Logins and cookies are never included.
+              </span>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" class="btn btn-outline btn-sm bg-card" @click="handleExport">
+                  <AppIcon name="download" :size="13" :stroke="2" />
+                  Export…
+                </button>
+                <button type="button" class="btn btn-outline btn-sm bg-card" @click="handleImport">
+                  <AppIcon name="upload" :size="13" :stroke="2" />
+                  Import…
+                </button>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Keyboard Shortcuts section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
-          >
-            Keyboard Shortcuts
-          </h3>
-          <div class="bg-chrome-hover/50 border border-chrome-border rounded divide-y divide-chrome-border">
-            <div
-              v-for="shortcut in shortcuts"
-              :key="shortcut.keys"
-              class="flex items-center justify-between px-3 py-2"
-            >
-              <span class="text-sm text-chrome-fg-secondary">{{ shortcut.description }}</span>
-              <kbd class="text-xs text-chrome-fg-muted bg-chrome-hover/50 border border-chrome-border rounded px-1.5 py-0.5 font-mono">{{ shortcut.keys }}</kbd>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="flex min-w-[150px] flex-1 flex-col gap-0.5">
+                <span class="text-[12px] text-fg2">Silo v{{ appVersion }}</span>
+                <span
+                  v-if="uiStore.updaterUpToDate && !checkingForUpdates"
+                  class="flex items-center gap-1.5 text-[12px] text-success"
+                >
+                  <AppIcon name="check" :size="12" :stroke="2.5" />
+                  You’re on the latest version
+                </span>
+              </span>
+              <button
+                type="button"
+                class="btn btn-outline btn-sm"
+                :disabled="checkingForUpdates"
+                @click="handleCheckForUpdates"
+              >
+                {{ checkingForUpdates ? 'Checking…' : 'Check for updates' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="openWebsite"
+              >
+                silo.dev
+              </button>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <!-- Data section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
+          <!-- Shortcuts -->
+          <section
+            aria-labelledby="h-keys"
+            class="col-span-full flex flex-col gap-1.5 rounded-2xl bg-card px-5 pt-[18px] pb-3.5 shadow-[0_0_0_1px_var(--card-line)]"
           >
-            Data
-          </h3>
-          <div class="space-y-2">
-            <button
-              @click="handleExport"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-4 h-4 text-chrome-fg-muted"
+            <h2 id="h-keys" class="m-0 mb-1 font-display text-[17px] font-bold tracking-[-0.01em]">
+              Shortcuts
+            </h2>
+            <div class="grid gap-x-5 [grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))]">
+              <div
+                v-for="k in shortcuts"
+                :key="k.label"
+                class="flex h-[34px] items-center justify-between gap-2.5 border-b border-row-line"
               >
-                <path
-                  d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"
-                />
-                <path
-                  d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"
-                />
-              </svg>
-              <span>Export Configuration</span>
-            </button>
-            <button
-              @click="handleImport"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-4 h-4 text-chrome-fg-muted"
-              >
-                <path
-                  d="M9.25 13.25a.75.75 0 001.5 0V4.636l2.955 3.129a.75.75 0 001.09-1.03l-4.25-4.5a.75.75 0 00-1.09 0l-4.25 4.5a.75.75 0 101.09 1.03L9.25 4.636v8.614z"
-                />
-                <path
-                  d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"
-                />
-              </svg>
-              <span>Import Configuration</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Updates section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
-          >
-            Updates
-          </h3>
-          <div class="space-y-2">
-            <button
-              @click="handleCheckForUpdates"
-              :disabled="checkingForUpdates"
-              class="w-full flex items-center gap-3 px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded hover:border-chrome-border transition-colors text-sm text-chrome-fg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-4 h-4 text-chrome-fg-muted"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span v-if="checkingForUpdates">Checking...</span>
-              <span v-else>Check for Updates</span>
-            </button>
-            <p
-              v-if="uiStore.updaterUpToDate && !checkingForUpdates"
-              class="text-xs text-semantic-success px-3"
-            >
-              You're on the latest version.
-            </p>
-          </div>
-        </div>
-
-        <!-- About section -->
-        <div>
-          <h3
-            class="text-sm font-semibold text-chrome-fg-secondary uppercase tracking-wider mb-3"
-          >
-            About
-          </h3>
-          <p class="text-sm text-chrome-fg-faint">Silo v{{ appVersion }}</p>
-          <a
-            href="#"
-            @click.prevent="openWebsite"
-            class="text-sm text-accent hover:text-accent-hover transition-colors"
-          >silo.dev</a>
+                <span class="text-[12.5px] text-fg2">{{ k.label }}</span>
+                <kbd
+                  class="inline-flex h-5 items-center rounded-[5px] bg-field px-1.5 text-[10.5px] text-fg1 shadow-[inset_0_0_0_1px_var(--field-line)]"
+                >
+                  {{ k.keys }}
+                </kbd>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </template>

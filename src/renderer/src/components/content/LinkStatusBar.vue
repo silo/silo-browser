@@ -8,7 +8,7 @@ const uiStore = useUiStore()
   <Transition name="status-bar">
     <div
       v-if="uiStore.hoveredLinkUrl"
-      class="absolute bottom-0 left-0 z-20 max-w-[70%] px-2 py-1 text-xs text-chrome-fg-secondary bg-surface-chrome/90 border border-chrome-border rounded-tr truncate pointer-events-none"
+      class="pointer-events-none absolute bottom-1.5 left-1.5 z-20 max-w-[70%] truncate rounded-lg bg-panel px-2.5 py-1 font-mono text-[11px] text-fg2 shadow-menu"
     >
       {{ uiStore.hoveredLinkUrl }}
     </div>

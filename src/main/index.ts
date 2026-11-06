@@ -15,15 +15,17 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
 import { initAutoUpdater } from './updater'
-import { getCachedState, loadState, saveState } from './store'
+import { getCachedState, loadState, saveState, LIGHT_SHADE_HEX, DARK_SHADE_HEX } from './store'
 import icon from '../../resources/icon.png?asset'
 
 function createWindow(): BrowserWindow {
   const state = getCachedState()
-  const isLight =
-    state.themeMode === 'light' ||
-    (state.themeMode === 'system' && false) // system detection not available in main process, default dark
-  const bgColor = isLight ? '#f9fafb' : '#141414'
+  // nativeTheme.themeSource is set from the saved theme before the window is created,
+  // so shouldUseDarkColors already reflects light / dark / system.
+  const isDark = nativeTheme.shouldUseDarkColors
+  const bgColor = isDark
+    ? (DARK_SHADE_HEX[state.darkShade] ?? DARK_SHADE_HEX.pitch)
+    : (LIGHT_SHADE_HEX[state.lightShade] ?? LIGHT_SHADE_HEX.stone)
 
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -33,8 +35,18 @@ function createWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: bgColor,
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
-    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 12, y: 12 } } : {}),
+    // Frameless on every platform: the app draws its own 44px title row.
+    // macOS keeps the traffic lights; Windows/Linux get the OS window-controls overlay.
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 16, y: 16 } }
+      : {
+          titleBarOverlay: {
+            color: bgColor,
+            symbolColor: isDark ? '#F3F2F0' : '#1A1917',
+            height: 44
+          }
+        }),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -191,7 +203,8 @@ function setupPermissionHandlers(ses: Electron.Session): void {
   // Strip Electron/app identifiers from this session's user agent so sites
   // (especially Google sign-in) see a standard Chrome UA.
   ses.setUserAgent(
-    ses.getUserAgent()
+    ses
+      .getUserAgent()
       .replace(/\s+Electron\/\S+/, '')
       .replace(/\s+silo-browser\/\S+/i, '')
   )
@@ -250,7 +263,8 @@ function setupPermissionHandlers(ses: Electron.Session): void {
 
 // ── External protocol handling helpers ───────────────────────────────────────
 // A URL is "external" if it isn't a standard web/internal scheme.
-const INTERNAL_PROTOCOL_RE = /^(https?:\/\/|about:|chrome:|devtools:|file:|javascript:|data:|blob:)/i
+const INTERNAL_PROTOCOL_RE =
+  /^(https?:\/\/|about:|chrome:|devtools:|file:|javascript:|data:|blob:)/i
 
 function isExternalProtocol(url: string): boolean {
   return !!url && !INTERNAL_PROTOCOL_RE.test(url)
@@ -490,10 +504,24 @@ app.whenReady().then(() => {
       label: 'File',
       submenu: [
         {
-          label: 'New Group',
+          label: 'New Tab',
+          accelerator: 'CmdOrCtrl+T',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:new-tab')
+          }
+        },
+        {
+          label: 'New Silo',
           accelerator: 'CmdOrCtrl+N',
           click: (_item, win): void => {
             if (win) (win as BrowserWindow).webContents.send('shortcut:new-group')
+          }
+        },
+        {
+          label: 'Open Location…',
+          accelerator: 'CmdOrCtrl+L',
+          click: (_item, win): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:command-bar')
           }
         },
         { type: 'separator' },
@@ -562,6 +590,16 @@ app.whenReady().then(() => {
           }
         },
         { role: 'toggleDevTools' },
+        { type: 'separator' },
+        // Go to tab 1–9 — menu accelerators so they also work while a page has focus
+        ...Array.from({ length: 9 }, (_, i) => ({
+          label: `Go to Tab ${i + 1}`,
+          accelerator: `CmdOrCtrl+${i + 1}`,
+          visible: false,
+          click: (_item: Electron.MenuItem, win: Electron.BaseWindow | undefined): void => {
+            if (win) (win as BrowserWindow).webContents.send('shortcut:go-to-tab', i)
+          }
+        })),
         { type: 'separator' },
         {
           label: 'Zoom In',

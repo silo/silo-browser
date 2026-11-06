@@ -1,180 +1,113 @@
 @import 'tailwindcss';
 
-/* ===== Accent Color ===== */
+/*
+ * Design tokens. The values are set at runtime on <html> by useAppTheme()
+ * (see utils/theme.ts) from the chosen theme, shade, accent and silo tint.
+ *
+ *   --base       ground color for the chosen light/dark shade
+ *   --silo       active silo color, --tp how much of it tints the chrome
+ *   --chrome     window chrome = silo tint mixed into the ground
+ *   --rail       silo rail (rail + list layout)
+ *   --page       web content card
+ */
 :root {
-  --accent-hue: 220;
-  --accent-saturation: 90%;
+  --silo: var(--base);
+  --tp: 0%;
+  --tr: 0%;
+  --chrome: color-mix(in srgb, var(--silo) var(--tp), var(--base));
+  --rail: color-mix(in srgb, var(--silo) var(--tr), var(--rail-base));
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-/* ===== Dark Theme (default) ===== */
-[data-theme='dark'] {
-  --surface-base: #111827;
-  --surface-raised: #1f2937;
-  --surface-hover: #374151;
-  --surface-active: #4b5563;
-  --surface-input: #111827;
+@theme inline {
+  --font-sans:
+    'Instrument Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Instrument Sans Variable', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --fg-primary: #ffffff;
-  --fg-secondary: #d1d5db;
-  --fg-muted: #9ca3af;
-  --fg-faint: #6b7280;
-  --fg-ghost: #4b5563;
-
-  --border-default: #374151;
-  --border-light: #4b5563;
-
-  --accent: hsl(var(--accent-hue), var(--accent-saturation), 48%);
-  --accent-hover: hsl(var(--accent-hue), var(--accent-saturation), 56%);
-  --accent-soft: hsl(var(--accent-hue), var(--accent-saturation), 65%);
-  --accent-muted: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.2);
-  --accent-ring: hsla(var(--accent-hue), var(--accent-saturation), 60%, 0.4);
-
-  --semantic-danger: #ef4444;
-  --semantic-danger-soft: #f87171;
-  --semantic-success: #4ade80;
-
-  --overlay: rgba(0, 0, 0, 0.5);
-
-  --surface-chrome: var(--surface-raised);
-
-  --chrome-fg-primary: var(--fg-primary);
-  --chrome-fg-secondary: var(--fg-secondary);
-  --chrome-fg-muted: var(--fg-muted);
-  --chrome-fg-faint: var(--fg-faint);
-  --chrome-border: var(--border-default);
-  --chrome-hover: var(--surface-hover);
-  --chrome-active: var(--surface-active);
-
-  color-scheme: dark;
-}
-
-/* ===== Light Theme ===== */
-[data-theme='light'] {
-  --surface-base: #f9fafb;
-  --surface-raised: #ffffff;
-  --surface-hover: #f3f4f6;
-  --surface-active: #e5e7eb;
-  --surface-input: #ffffff;
-
-  --fg-primary: #111827;
-  --fg-secondary: #374151;
-  --fg-muted: #6b7280;
-  --fg-faint: #9ca3af;
-  --fg-ghost: #d1d5db;
-
-  --border-default: #e5e7eb;
-  --border-light: #d1d5db;
-
-  --accent: hsl(var(--accent-hue), var(--accent-saturation), 45%);
-  --accent-hover: hsl(var(--accent-hue), var(--accent-saturation), 40%);
-  --accent-soft: hsl(var(--accent-hue), var(--accent-saturation), 45%);
-  --accent-muted: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.12);
-  --accent-ring: hsla(var(--accent-hue), var(--accent-saturation), 50%, 0.3);
-
-  --semantic-danger: #dc2626;
-  --semantic-danger-soft: #ef4444;
-  --semantic-success: #16a34a;
-
-  --overlay: rgba(0, 0, 0, 0.3);
-
-  --surface-chrome: var(--surface-raised);
-
-  --chrome-fg-primary: var(--fg-primary);
-  --chrome-fg-secondary: var(--fg-secondary);
-  --chrome-fg-muted: var(--fg-muted);
-  --chrome-fg-faint: var(--fg-faint);
-  --chrome-border: var(--border-default);
-  --chrome-hover: var(--surface-hover);
-  --chrome-active: var(--surface-active);
-
-  color-scheme: light;
-}
-
-/* ===== Tailwind v4 Theme Registration ===== */
-@theme {
-  --color-surface-base: var(--surface-base);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-hover: var(--surface-hover);
-  --color-surface-active: var(--surface-active);
-  --color-surface-input: var(--surface-input);
-  --color-surface-chrome: var(--surface-chrome);
-
-  --color-chrome-fg-primary: var(--chrome-fg-primary);
-  --color-chrome-fg-secondary: var(--chrome-fg-secondary);
-  --color-chrome-fg-muted: var(--chrome-fg-muted);
-  --color-chrome-fg-faint: var(--chrome-fg-faint);
-  --color-chrome-border: var(--chrome-border);
-  --color-chrome-hover: var(--chrome-hover);
-  --color-chrome-active: var(--chrome-active);
-
-  --color-fg-primary: var(--fg-primary);
-  --color-fg-secondary: var(--fg-secondary);
-  --color-fg-muted: var(--fg-muted);
-  --color-fg-faint: var(--fg-faint);
-  --color-fg-ghost: var(--fg-ghost);
-
-  --color-border-default: var(--border-default);
-  --color-border-light: var(--border-light);
-
+  --color-base: var(--base);
+  --color-chrome: var(--chrome);
+  --color-rail: var(--rail);
+  --color-silo: var(--silo);
+  --color-fg1: var(--fg1);
+  --color-fg2: var(--fg2);
+  --color-fg3: var(--fg3);
+  --color-line: var(--line);
+  --color-hover: var(--hover);
+  --color-press: var(--press);
+  --color-tab-on: var(--tab-on);
+  --color-omni: var(--omni);
+  --color-page: var(--page);
+  --color-sk1: var(--sk1);
+  --color-sk2: var(--sk2);
+  --color-sk3: var(--sk3);
+  --color-card: var(--card);
+  --color-card-line: var(--card-line);
+  --color-field: var(--field);
+  --color-field-line: var(--field-line);
+  --color-input: var(--input);
+  --color-input-line: var(--input-line);
+  --color-track: var(--track);
+  --color-row-line: var(--row-line);
+  --color-panel: var(--panel);
+  --color-scrim: var(--scrim);
+  --color-sel: var(--sel);
+  --color-tip-bg: var(--tip-bg);
+  --color-tip-fg: var(--tip-fg);
+  --color-badge: var(--badge);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
   --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-txt: var(--accent-txt);
   --color-accent-soft: var(--accent-soft);
-  --color-accent-muted: var(--accent-muted);
-  --color-accent-ring: var(--accent-ring);
 
-  --color-semantic-danger: var(--semantic-danger);
-  --color-semantic-danger-soft: var(--semantic-danger-soft);
-  --color-semantic-success: var(--semantic-success);
-
-  --color-overlay: var(--overlay);
+  --shadow-tab-on: var(--tab-on-shadow);
+  --shadow-card: var(--card-shadow);
+  --shadow-dialog: var(--dialog-shadow);
+  --shadow-menu: var(--menu-shadow);
 }
 
-/* ===== Global Accent for Checkboxes ===== */
-input[type='checkbox'] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 1.125rem;
-  height: 1.125rem;
-  border: 1.5px solid var(--chrome-border);
-  border-radius: 4px;
-  background-color: var(--surface-chrome);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background-color 150ms ease, border-color 150ms ease;
+@layer base {
+  html,
+  body {
+    margin: 0;
+    background: transparent;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--fg1);
+    -webkit-font-smoothing: antialiased;
+    /* Prevent select-all from highlighting app chrome */
+    user-select: none;
+  }
+
+  input,
+  textarea {
+    user-select: text;
+  }
+
+  /* Focus ring for keyboard users only */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+  }
 }
 
-input[type='checkbox']:hover {
-  border-color: var(--accent);
-}
-
-input[type='checkbox']:checked {
-  background-color: var(--accent);
-  border-color: var(--accent);
-}
-
-input[type='checkbox']:checked:hover {
-  background-color: var(--accent-hover);
-  border-color: var(--accent-soft);
-}
-
-input[type='checkbox']:checked::after {
-  content: '';
-  width: 5px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) translateY(-0.5px);
-}
-
-/* ===== Theme Transition ===== */
-[data-theme] * {
-  transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease;
+/* ===== Theme transition (chrome only — never the page content) ===== */
+.chrome-transition {
+  transition: background-color 0.25s ease;
 }
 
 webview,
@@ -184,23 +117,22 @@ textarea,
   transition: none !important;
 }
 
-/* ===== Prevent select-all from highlighting app chrome ===== */
-body {
-  user-select: none;
-}
-
-input,
-textarea {
-  user-select: text;
-}
-
-/* ===== macOS Window Drag ===== */
+/* ===== Window dragging (frameless title row on every platform) ===== */
 .app-drag {
   -webkit-app-region: drag;
 }
 
 .app-no-drag {
   -webkit-app-region: no-drag;
+}
+
+/*
+ * Space reserved for the OS window controls on Windows/Linux (Window Controls Overlay).
+ * Resolves to 0 on macOS, where the env() vars are not defined.
+ */
+.wco-spacer {
+  flex-shrink: 0;
+  width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
 }
 
 /* ===== Sidebar drag-and-drop reorder animations ===== */
@@ -220,20 +152,183 @@ textarea {
   position: absolute;
 }
 
-/* ===== Sidebar Scrollbar ===== */
-.sidebar-scroll::-webkit-scrollbar {
-  width: 4px;
+/* ===== Thin scrollbars for app chrome ===== */
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.sidebar-scroll::-webkit-scrollbar-track {
+.thin-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--chrome-fg-faint);
-  border-radius: 2px;
+.thin-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 3px;
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: var(--chrome-fg-muted);
+.thin-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--field-line);
+}
+
+@layer components {
+  /* ===== Native select styled like the design's dropdowns ===== */
+  .select-field {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 30px;
+    padding: 0 30px 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background-color: var(--field);
+    box-shadow: inset 0 0 0 1px var(--field-line);
+    font-size: 12.5px;
+    color: var(--fg1);
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  .select-field:focus-visible {
+    box-shadow:
+      inset 0 0 0 1.5px var(--accent),
+      0 0 0 3px var(--accent-soft);
+  }
+
+  /* ===== Text fields used in dialogs/settings ===== */
+  .field-input {
+    height: 36px;
+    box-sizing: border-box;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--input);
+    box-shadow: inset 0 0 0 1px var(--input-line);
+    font-size: 13.5px;
+    color: var(--fg1);
+    outline: none;
+  }
+
+  .field-input::placeholder {
+    color: var(--fg3);
+  }
+
+  .field-input:focus,
+  .field-input:focus-within {
+    box-shadow:
+      inset 0 0 0 1.5px var(--accent),
+      0 0 0 3px var(--accent-soft);
+  }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color 0.15s ease,
+      filter 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .btn-sm {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 7px;
+    font-size: 12px;
+  }
+
+  .btn-primary {
+    padding: 0 14px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.12);
+  }
+
+  .btn-danger {
+    padding: 0 14px;
+    background: var(--danger);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .btn-danger:hover {
+    filter: brightness(1.08);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg2);
+  }
+
+  .btn-ghost:hover {
+    background: var(--hover);
+    color: var(--fg1);
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--fg1);
+    box-shadow: inset 0 0 0 1px var(--field-line);
+  }
+
+  .btn-outline:hover {
+    background: var(--hover);
+  }
+
+  /* ===== Switch (role="switch" button) ===== */
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 36px;
+    height: 22px;
+    padding: 3px;
+    border: 0;
+    border-radius: 11px;
+    background: var(--track);
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+  }
+
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.18s ease;
+  }
+
+  .switch[aria-checked='true'] {
+    background: var(--accent);
+  }
+
+  .switch[aria-checked='true']::after {
+    transform: translateX(14px);
+    /* white on colored accents, dark on the near-white "Black" accent in dark mode */
+    background: var(--on-accent);
+  }
 }

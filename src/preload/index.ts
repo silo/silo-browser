@@ -22,8 +22,17 @@ const api = {
     ipcRenderer.invoke('store:save-sidebar-state', expanded),
   saveOpenLinksInNewTab: (value: boolean): Promise<void> =>
     ipcRenderer.invoke('store:save-open-links-in-new-tab', value),
-  saveTheme: (themeMode: string, accentColor: string, surfaceColor: string): Promise<void> =>
-    ipcRenderer.invoke('store:save-theme', themeMode, accentColor, surfaceColor),
+  saveAppearance: (appearance: {
+    themeMode: string
+    accentColor: string
+    lightShade: string
+    darkShade: string
+    siloTint: string
+  }): Promise<void> => ipcRenderer.invoke('store:save-appearance', appearance),
+  saveSidebarLayout: (layout: string): Promise<void> =>
+    ipcRenderer.invoke('store:save-sidebar-layout', layout),
+  setChromeColors: (colors: { background: string; symbol: string }): Promise<void> =>
+    ipcRenderer.invoke('window:set-chrome-colors', colors),
   saveChildTabs: (childTabs: unknown[], activeChildTabId: string | null): Promise<void> =>
     ipcRenderer.invoke('store:save-child-tabs', childTabs, activeChildTabId),
   saveDefaultSleepAfterMinutes: (value: number): Promise<void> =>
@@ -79,6 +88,24 @@ const api = {
   },
   removeCloseTabListener: (): void => {
     ipcRenderer.removeAllListeners('shortcut:close-tab')
+  },
+  onNewTab: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:new-tab', () => callback())
+  },
+  removeNewTabListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:new-tab')
+  },
+  onCommandBar: (callback: () => void): void => {
+    ipcRenderer.on('shortcut:command-bar', () => callback())
+  },
+  removeCommandBarListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:command-bar')
+  },
+  onGoToTab: (callback: (index: number) => void): void => {
+    ipcRenderer.on('shortcut:go-to-tab', (_event, index: number) => callback(index))
+  },
+  removeGoToTabListener: (): void => {
+    ipcRenderer.removeAllListeners('shortcut:go-to-tab')
   },
   onNewGroup: (callback: () => void): void => {
     ipcRenderer.on('shortcut:new-group', () => {

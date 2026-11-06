@@ -1,47 +1,77 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { computed } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useUiStore } from '@renderer/stores/ui'
-import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { useWebviewRegistry, type WebviewTag } from '@renderer/composables/useWebviewRegistry'
+import { isMac, shortcut, TRAFFIC_LIGHT_INSET } from '@renderer/utils/platform'
+import type { ChildTab } from '@renderer/types'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
+import SiloTile from '@renderer/components/common/SiloTile.vue'
+import TabIcon from '@renderer/components/common/TabIcon.vue'
+
+// The 44px title row: back / forward / reload / home, pop-up tabs, the address button
+// (opens the command bar) and "open in default browser". Doubles as the window drag area.
+const props = defineProps<{ fullWidth: boolean }>()
 
 const groupsStore = useGroupsStore()
 const topbarStore = useTopbarTabsStore()
 const uiStore = useUiStore()
 const webviewRegistry = useWebviewRegistry()
-const isMac = window.api.platform === 'darwin'
 
-const urlInput = ref('')
-const urlInputRef = ref<HTMLInputElement | null>(null)
+const tab = computed(() => groupsStore.activeTab)
+const silo = computed(() => groupsStore.activeGroup)
+const activeChild = computed(() =>
+  topbarStore.isChildActive ? topbarStore.findChild(topbarStore.activeTopbarTabId!) : null
+)
+
+const displayUrl = computed(() => {
+  if (activeChild.value) return activeChild.value.currentUrl || activeChild.value.url
+  return tab.value ? tab.value.currentUrl || tab.value.url : ''
+})
+
+const domain = computed(() => hostOf(displayUrl.value))
+
+const title = computed(() => {
+  if (activeChild.value) return activeChild.value.currentTitle || domain.value
+  return tab.value?.currentTitle || tab.value?.name || ''
+})
 
 const zoomPercent = computed(() => {
-  const tab = groupsStore.activeTab
-  if (!tab) return 100
-  const level = tab.zoomLevel ?? 0
+  const level = tab.value?.zoomLevel ?? 0
   return Math.round(Math.pow(1.2, level) * 100)
 })
 
-const displayUrl = computed(() => {
-  if (topbarStore.isChildActive) {
-    const child = topbarStore.findChild(topbarStore.activeTopbarTabId!)
-    return child?.currentUrl || child?.url || ''
+// Re-evaluated whenever the URL changes (did-navigate / did-navigate-in-page update it).
+// canGoBack() throws until the webview has emitted dom-ready, hence the try/catch.
+function historyFlag(fn: (wv: WebviewTag) => boolean): boolean {
+  void displayUrl.value
+  const wv = getActiveWebview()
+  if (!wv) return false
+  try {
+    return fn(wv)
+  } catch {
+    return false
   }
-  const tab = groupsStore.activeTab
-  if (!tab) return ''
-  return tab.currentUrl || tab.url
+}
+const canGoBack = computed(() => historyFlag((wv) => wv.canGoBack()))
+const canGoForward = computed(() => historyFlag((wv) => wv.canGoForward()))
+
+const paddingLeft = computed(() => {
+  if (!props.fullWidth) return '0px'
+  return isMac ? `${TRAFFIC_LIGHT_INSET + 2}px` : '12px'
 })
 
-const currentDomain = computed(() => {
-  const url = displayUrl.value
+function hostOf(url: string): string {
   if (!url) return ''
   try {
-    return new URL(url).hostname
+    return new URL(url).hostname.replace(/^www\./, '')
   } catch {
     return url
   }
-})
+}
 
-function getActiveWebview(): Electron.WebviewTag | null {
+function getActiveWebview(): WebviewTag | null {
   return webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
 }
 
@@ -57,67 +87,18 @@ function reload(): void {
   getActiveWebview()?.reload()
 }
 
-function openUrlBar(): void {
-  urlInput.value = displayUrl.value
-  uiStore.openUrlBar()
-  nextTick(() => {
-    urlInputRef.value?.focus()
-    urlInputRef.value?.select()
-  })
-}
-
-function closeUrlBar(): void {
-  uiStore.closeUrlBar()
-}
-
-// Re-focus input when urlBarOpen becomes true externally (e.g. Cmd+L)
-watch(
-  () => uiStore.urlBarOpen,
-  (open) => {
-    if (open) {
-      urlInput.value = displayUrl.value
-      nextTick(() => {
-        urlInputRef.value?.focus()
-        urlInputRef.value?.select()
-      })
-    }
-  }
-)
-
-function navigateToUrl(): void {
-  const wv = getActiveWebview()
-  if (!wv) return
-  let url = urlInput.value.trim()
-  if (!url) return
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = `https://${url}`
-  }
-  wv.loadURL(url)
-  closeUrlBar()
-}
-
 function goHome(): void {
-  const tab = groupsStore.activeTab
-  if (!tab) return
+  if (!tab.value) return
   if (topbarStore.isChildActive) {
-    // On a child tab — just switch back to the primary tab, don't reload
+    // On a pop-up tab — switch back to the primary tab, don't reload it
     topbarStore.activateMainTab()
   } else {
-    // Already on the primary tab — navigate back to its original URL
-    const wv = webviewRegistry.getMain(tab.id)
-    if (wv) wv.loadURL(tab.url)
+    webviewRegistry.getMain(tab.value.id)?.loadURL(tab.value.url)
   }
-}
-
-function resetZoom(): void {
-  const wv = getActiveWebview()
-  if (!wv) return
-  wv.setZoomLevel(0)
-  if (groupsStore.activeTabId) groupsStore.setTabZoomLevel(groupsStore.activeTabId, 0)
 }
 
 function openExternal(): void {
-  window.api.openExternal(displayUrl.value)
+  if (displayUrl.value) window.api.openExternal(displayUrl.value)
 }
 
 function closeChildTab(childId: string): void {
@@ -128,172 +109,183 @@ function closeChildTab(childId: string): void {
   }
 }
 
-function childTabLabel(child: { currentTitle?: string; url: string }): string {
-  if (child.currentTitle) return child.currentTitle
-  try {
-    return new URL(child.url).hostname
-  } catch {
-    return child.url
-  }
+function childLabel(child: ChildTab): string {
+  return child.currentTitle || hostOf(child.currentUrl || child.url)
 }
+
+const navButton =
+  'app-no-drag flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg text-fg2 transition-colors hover:bg-hover hover:text-fg1 active:bg-press disabled:pointer-events-none disabled:opacity-35'
 </script>
 
 <template>
-  <div
-    v-if="groupsStore.activeTab"
-    :class="[
-      'flex items-center gap-1.5 pr-2 py-2 bg-surface-chrome border-b border-chrome-border',
-      isMac ? 'app-drag' : '',
-      isMac && !uiStore.sidebarExpanded ? 'pl-8' : 'pl-2'
-    ]"
+  <header
+    class="app-drag flex h-11 min-w-0 items-center gap-0.5 pr-2"
+    :style="{ paddingLeft }"
   >
-    <button
-      @click="goBack"
-      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-      title="Back"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <button
-      @click="goForward"
-      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-      title="Forward"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <button
-      @click="reload"
-      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
-      title="Reload"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <!-- Home — navigate primary tab back to its original URL -->
-    <button
-      @click="goHome"
-      :class="[
-        'app-no-drag p-1 rounded transition-colors',
-        topbarStore.currentChildTabs.length > 0 && !topbarStore.isChildActive
-          ? 'bg-chrome-active text-chrome-fg-primary'
-          : 'text-chrome-fg-secondary hover:bg-chrome-hover/50'
-      ]"
-      title="Go to home URL"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <!-- Topbar tabs (only when child tabs exist) -->
-    <div
-      v-if="topbarStore.currentChildTabs.length > 0"
-      class="app-no-drag flex items-center gap-0.5 mx-1 overflow-x-auto shrink-0 max-w-[50%]"
-    >
-      <!-- Child tabs -->
-      <div
-        v-for="child in topbarStore.currentChildTabs"
-        :key="child.id"
-        :class="[
-          'flex items-center gap-1 px-2 py-1.5 text-xs leading-none rounded shrink-0 transition-colors',
-          topbarStore.activeTopbarTabId === child.id
-            ? 'bg-chrome-active text-chrome-fg-primary'
-            : 'text-chrome-fg-secondary hover:bg-chrome-hover/50'
-        ]"
+    <template v-if="tab">
+      <button
+        type="button"
+        :class="navButton"
+        aria-label="Back"
+        title="Back"
+        :disabled="!canGoBack"
+        @click="goBack"
       >
-        <button
-          @click="topbarStore.activateChildTab(child.id)"
-          class="truncate max-w-[100px]"
-          :title="childTabLabel(child)"
+        <AppIcon name="back" :size="17" />
+      </button>
+      <button
+        type="button"
+        :class="navButton"
+        aria-label="Forward"
+        title="Forward"
+        :disabled="!canGoForward"
+        @click="goForward"
+      >
+        <AppIcon name="forward" :size="17" />
+      </button>
+      <button
+        type="button"
+        :class="navButton"
+        aria-label="Reload"
+        :title="`Reload (${shortcut('R')})`"
+        @click="reload"
+      >
+        <AppIcon name="reload" :size="15" :stroke="2" />
+      </button>
+      <button
+        type="button"
+        :class="navButton"
+        aria-label="Go to home URL"
+        title="Go to home URL"
+        @click="goHome"
+      >
+        <AppIcon name="home" :size="15" :stroke="2" />
+      </button>
+
+      <!-- Pop-up tabs opened from this tab -->
+      <div
+        v-if="topbarStore.currentChildTabs.length > 0"
+        role="tablist"
+        :aria-label="`Opened from ${tab.name}`"
+        class="app-no-drag thin-scroll ml-2 flex min-w-0 shrink items-center gap-0.5 overflow-x-auto"
+      >
+        <div
+          class="flex h-7 shrink-0 items-center rounded-lg px-2.5 transition-colors"
+          :class="!topbarStore.isChildActive ? 'bg-tab-on shadow-tab-on' : 'hover:bg-hover'"
         >
-          {{ childTabLabel(child) }}
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="!topbarStore.isChildActive"
+            class="flex items-center gap-[7px]"
+            :class="!topbarStore.isChildActive ? 'text-fg1' : 'text-fg2'"
+            @click="topbarStore.activateMainTab()"
+          >
+            <TabIcon
+              :name="tab.name"
+              :url="tab.url"
+              :icon-url="tab.iconUrl"
+              :icon-emoji="tab.iconEmoji"
+              :size="14"
+            />
+            <span
+              class="max-w-[150px] truncate text-[12.5px]"
+              :class="!topbarStore.isChildActive ? 'font-semibold' : 'font-medium'"
+            >
+              {{ tab.name }}
+            </span>
+          </button>
+        </div>
+        <div
+          v-for="child in topbarStore.currentChildTabs"
+          :key="child.id"
+          class="flex h-7 shrink-0 items-center gap-1 rounded-lg pr-1 pl-2.5 transition-colors"
+          :class="
+            topbarStore.activeTopbarTabId === child.id ? 'bg-tab-on shadow-tab-on' : 'hover:bg-hover'
+          "
+        >
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="topbarStore.activeTopbarTabId === child.id"
+            class="flex min-w-0 items-center gap-[7px]"
+            :class="topbarStore.activeTopbarTabId === child.id ? 'text-fg1' : 'text-fg2'"
+            :title="childLabel(child)"
+            @click="topbarStore.activateChildTab(child.id)"
+          >
+            <TabIcon
+              v-if="child.iconUrl"
+              :name="childLabel(child)"
+              :icon-url="child.iconUrl"
+              :size="14"
+            />
+            <AppIcon v-else name="file" :size="14" />
+            <span
+              class="max-w-[150px] truncate text-[12.5px]"
+              :class="topbarStore.activeTopbarTabId === child.id ? 'font-semibold' : 'font-medium'"
+            >
+              {{ childLabel(child) }}
+            </span>
+            <AppIcon
+              v-if="child.isAudioPlaying"
+              name="audio-small"
+              :size="13"
+              :stroke="2"
+              class="text-accent-txt"
+            />
+          </button>
+          <button
+            type="button"
+            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg3 transition-colors hover:bg-hover hover:text-fg1"
+            :aria-label="`Close ${childLabel(child)}`"
+            :title="`Close (${shortcut('W')})`"
+            @click.stop="closeChildTab(child.id)"
+          >
+            <AppIcon name="close" :size="11" :stroke="2.5" />
+          </button>
+        </div>
+      </div>
+
+      <div class="ml-auto flex min-w-0 items-center gap-1 pl-2">
+        <!-- Address button: opens the command bar -->
+        <button
+          type="button"
+          class="app-no-drag flex h-8 w-[400px] min-w-[180px] max-w-full shrink items-center gap-[9px] rounded-[10px] bg-omni pr-2.5 pl-1 text-left shadow-[inset_0_0_0_1px_var(--omni-line)] transition-[filter] hover:brightness-[0.98]"
+          :aria-label="`${title}, ${domain}${silo ? `, in ${silo.name} silo` : ''}. Press ${shortcut('L')} to search or enter address`"
+          :title="displayUrl"
+          @click="uiStore.openCommandBar()"
+        >
+          <span
+            v-if="silo"
+            class="flex h-6 max-w-[45%] shrink-0 items-center gap-1.5 rounded-[7px] bg-accent pr-2 pl-1 font-display text-[12px] font-bold text-on-accent"
+          >
+            <SiloTile :silo="silo" :size="16" :radius="5" />
+            <span class="truncate">{{ silo.name }}</span>
+          </span>
+          <span class="flex min-w-0 flex-1 items-baseline gap-[7px] overflow-hidden whitespace-nowrap">
+            <span class="truncate text-[13px] font-semibold text-fg1">{{ title }}</span>
+            <span class="truncate text-[12px] text-fg3">{{ domain }}</span>
+          </span>
+          <span
+            v-if="zoomPercent !== 100"
+            class="shrink-0 font-mono text-[10.5px] text-fg3"
+            :title="`Zoom ${zoomPercent}% — ${shortcut('0')} resets`"
+          >
+            {{ zoomPercent }}%
+          </span>
+          <kbd class="shrink-0 text-[10.5px] text-fg3">{{ shortcut('L') }}</kbd>
         </button>
-        <svg
-          v-if="child.isAudioPlaying"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke="currentColor"
-          class="w-3 h-3 shrink-0 text-accent-soft"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
-        </svg>
         <button
-          @click.stop="closeChildTab(child.id)"
-          class="text-chrome-fg-muted hover:text-chrome-fg-primary shrink-0 leading-none"
-          title="Close tab"
+          type="button"
+          :class="navButton"
+          aria-label="Open in default browser"
+          title="Open in default browser"
+          @click="openExternal"
         >
-          &times;
+          <AppIcon name="external" :size="15" />
         </button>
       </div>
-    </div>
-
-    <!-- Spacer to push URL button and external link to the right -->
-    <div class="flex-1" />
-
-    <!-- Zoom indicator (shown when not at 100%) — click to reset -->
-    <button
-      v-if="zoomPercent !== 100"
-      @click="resetZoom"
-      class="app-no-drag group px-1.5 py-0.5 text-[11px] leading-none font-medium text-chrome-fg-muted bg-chrome-hover/50 border border-chrome-border rounded select-none hover:bg-chrome-hover transition-colors"
-      title="Reset zoom"
-    >
-      <span class="group-hover:hidden">{{ zoomPercent }}%</span>
-      <span class="hidden group-hover:inline">Reset</span>
-    </button>
-
-    <!-- URL bar button (compact) -->
-    <button
-      @click="openUrlBar"
-      class="app-no-drag flex items-center gap-1.5 px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm leading-none text-chrome-fg-muted hover:text-chrome-fg-secondary hover:bg-chrome-hover transition-colors max-w-[240px]"
-      title="Navigate to URL (Cmd+L)"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5 shrink-0">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clip-rule="evenodd" />
-      </svg>
-      <span class="truncate">{{ currentDomain || 'Enter URL' }}</span>
-    </button>
-
-    <button
-      @click="openExternal"
-      class="app-no-drag p-1 text-chrome-fg-secondary rounded hover:bg-chrome-hover/50 transition-colors"
-      title="Open in default browser"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-        <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
-        <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
-      </svg>
-    </button>
-  </div>
-
-  <!-- URL bar modal -->
-  <Teleport to="body">
-    <div
-      v-if="uiStore.urlBarOpen"
-      class="fixed inset-0 z-50 flex items-start justify-center pt-24"
-      @click.self="closeUrlBar"
-      @keydown.escape="closeUrlBar"
-    >
-      <div class="bg-surface-chrome rounded-lg shadow-2xl border border-chrome-border w-[560px] p-3">
-        <input
-          ref="urlInputRef"
-          v-model="urlInput"
-          type="text"
-          class="nav-url-input w-full px-3 py-2 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary focus:outline-none focus:border-accent-soft focus:text-chrome-fg-primary"
-          placeholder="Enter URL and press Enter"
-          @keydown.enter="navigateToUrl"
-          @keydown.escape="closeUrlBar"
-        />
-      </div>
-    </div>
-  </Teleport>
+    </template>
+    <span class="wco-spacer" aria-hidden="true" />
+  </header>
 </template>

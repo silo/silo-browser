@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { UA_PRESETS, matchPreset } from '@renderer/utils/user-agent-presets'
 
 const props = withDefaults(
   defineProps<{
     modelValue: string
     defaultLabel?: string
-    variant?: 'surface' | 'chrome'
+    /** Stretch the dropdown to the container width (dialogs) instead of fitting its text */
+    block?: boolean
   }>(),
-  { defaultLabel: 'Use default', variant: 'surface' }
+  { defaultLabel: 'Use default', block: false }
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -43,24 +44,17 @@ function onTextInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLTextAreaElement).value)
 }
 
-const isChrome = computed(() => props.variant === 'chrome')
-
-const selectClasses = computed(() =>
-  isChrome.value
-    ? 'px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-sm text-chrome-fg-secondary cursor-pointer focus:outline-none focus:border-accent'
-    : 'w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-sm focus:outline-none focus:border-accent-soft'
-)
-
-const textareaClasses = computed(() =>
-  isChrome.value
-    ? 'w-full px-2 py-1 bg-chrome-hover/50 border border-chrome-border rounded text-xs text-chrome-fg-secondary font-mono focus:outline-none focus:border-accent resize-none'
-    : 'w-full px-3 py-2 bg-surface-input border border-border-light rounded text-fg-primary text-xs font-mono focus:outline-none focus:border-accent-soft resize-none'
-)
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <select :value="mode" @change="onPresetChange" :class="selectClasses">
+  <div class="flex flex-col items-stretch gap-2" :class="block ? 'w-full' : 'items-end'">
+    <select
+      :value="mode"
+      class="select-field max-w-full"
+      :class="block ? 'w-full' : ''"
+      aria-label="User agent"
+      @change="onPresetChange"
+    >
       <option value="">{{ defaultLabel }}</option>
       <option v-for="preset in UA_PRESETS" :key="preset.id" :value="preset.id">
         {{ preset.label }}
@@ -70,10 +64,11 @@ const textareaClasses = computed(() =>
     <textarea
       v-if="mode === 'custom'"
       :value="modelValue"
-      @input="onTextInput"
       rows="3"
+      aria-label="Custom user agent"
       placeholder="Paste a custom user agent string"
-      :class="textareaClasses"
+      class="w-full min-w-[260px] resize-none rounded-[9px] border-0 bg-input px-2.5 py-2 font-mono text-[11.5px] text-fg1 shadow-[inset_0_0_0_1px_var(--input-line)] outline-none placeholder:text-fg3 focus:shadow-[inset_0_0_0_1.5px_var(--accent),0_0_0_3px_var(--accent-soft)]"
+      @input="onTextInput"
     ></textarea>
   </div>
 </template>

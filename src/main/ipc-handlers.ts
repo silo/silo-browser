@@ -1,7 +1,7 @@
 import { app, ipcMain, nativeTheme, session, shell, dialog, BrowserWindow } from 'electron'
 import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
-import { getCachedState, saveState } from './store'
+import { getCachedState, normalizeState, saveState } from './store'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
 
 export function registerIpcHandlers(): void {
@@ -37,10 +37,45 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(
-    'store:save-theme',
-    async (_event, themeMode: string, accentColor: string, surfaceColor: string) => {
-      nativeTheme.themeSource = themeMode as 'dark' | 'light' | 'system'
-      await saveState({ themeMode, accentColor, surfaceColor })
+    'store:save-appearance',
+    async (
+      _event,
+      appearance: {
+        themeMode: string
+        accentColor: string
+        lightShade: string
+        darkShade: string
+        siloTint: string
+      }
+    ) => {
+      const normalized = normalizeState({ ...getCachedState(), ...appearance })
+      nativeTheme.themeSource = normalized.themeMode as 'dark' | 'light' | 'system'
+      await saveState({
+        themeMode: normalized.themeMode,
+        accentColor: normalized.accentColor,
+        lightShade: normalized.lightShade,
+        darkShade: normalized.darkShade,
+        siloTint: normalized.siloTint
+      })
+    }
+  )
+
+  ipcMain.handle('store:save-sidebar-layout', async (_event, layout: string) => {
+    const normalized = normalizeState({ ...getCachedState(), sidebarLayout: layout })
+    await saveState({ sidebarLayout: normalized.sidebarLayout })
+  })
+
+  // The window background and (Windows/Linux) title bar overlay follow the app chrome color,
+  // which changes with theme, shade and the active silo's tint.
+  ipcMain.handle(
+    'window:set-chrome-colors',
+    (event, colors: { background: string; symbol: string }) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) return
+      win.setBackgroundColor(colors.background)
+      if (process.platform !== 'darwin') {
+        win.setTitleBarOverlay({ color: colors.background, symbolColor: colors.symbol })
+      }
     }
   )
 
@@ -115,20 +150,23 @@ export function registerIpcHandlers(): void {
       const raw = readFileSync(result.filePaths[0], 'utf-8')
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed.groups)) {
-        const childTabs = Array.isArray(parsed.childTabs) ? parsed.childTabs : []
-        const activeChildTabId =
-          typeof parsed.activeChildTabId === 'string' ? parsed.activeChildTabId : null
-        const themeMode = typeof parsed.themeMode === 'string' ? parsed.themeMode : undefined
-        const accentColor = typeof parsed.accentColor === 'string' ? parsed.accentColor : undefined
-        const surfaceColor = typeof parsed.surfaceColor === 'string' ? parsed.surfaceColor : undefined
+        // Validate everything (and migrate legacy values) through the same path as startup,
+        // keeping local-only state such as granted permissions and the active tab.
+        const current = getCachedState()
+        const merged = normalizeState({ ...current, ...parsed })
         await saveState({
-          groups: parsed.groups,
-          childTabs,
-          activeChildTabId,
-          ...(themeMode && { themeMode }),
-          ...(accentColor && { accentColor }),
-          ...(surfaceColor && { surfaceColor })
+          groups: merged.groups,
+          // Child tabs belong to the imported tabs; never keep the current ones around
+          childTabs: Array.isArray(parsed.childTabs) ? merged.childTabs : [],
+          activeChildTabId: Array.isArray(parsed.childTabs) ? merged.activeChildTabId : null,
+          themeMode: merged.themeMode,
+          accentColor: merged.accentColor,
+          lightShade: merged.lightShade,
+          darkShade: merged.darkShade,
+          siloTint: merged.siloTint,
+          sidebarLayout: merged.sidebarLayout
         })
+        nativeTheme.themeSource = merged.themeMode as 'dark' | 'light' | 'system'
         return parsed
       }
       return null

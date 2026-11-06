@@ -1,3 +1,6 @@
+/** Alias so .vue files can name the type without tripping eslint's no-undef on `Electron` */
+export type WebviewTag = Electron.WebviewTag
+
 const mainWebviews = new Map<string, Electron.WebviewTag>()
 const childWebviews = new Map<string, Electron.WebviewTag>()
 

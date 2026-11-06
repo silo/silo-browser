@@ -2,262 +2,104 @@
 import { computed, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
-import { useSidebarDrag } from '@renderer/composables/useSidebarDrag'
-import type { GroupItem, ContextMenuEntry } from '@renderer/types'
+import { useGroupDnd } from '@renderer/composables/useSidebarDnd'
+import { formatBadge, siloUnread, useSiloMenus } from '@renderer/composables/useSiloMenus'
+import type { GroupItem } from '@renderer/types'
 import SidebarTab from './SidebarTab.vue'
-import AddTabButton from './AddTabButton.vue'
+import SiloTile from '@renderer/components/common/SiloTile.vue'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
 
 const props = defineProps<{ group: GroupItem }>()
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
-const drag = useSidebarDrag()
+const { openSiloMenu } = useSiloMenus()
 
-const groupHeaderEl = ref<HTMLElement | null>(null)
+const headerEl = ref<HTMLElement | null>(null)
+const dnd = useGroupDnd(() => props.group, headerEl)
 
-const isBeingDragged = computed(
-  () => drag.isDraggingGroup.value && drag.dragId.value === props.group.id
-)
-
-const isDropHighlighted = computed(
-  () =>
-    drag.isDraggingTab.value &&
-    drag.dropTargetId.value === props.group.id &&
-    drag.dropTargetType.value === 'group' &&
-    drag.dropPosition.value === 'inside'
-)
-
-const showGroupIndicatorBefore = computed(
-  () =>
-    drag.isDraggingGroup.value &&
-    drag.dropTargetId.value === props.group.id &&
-    drag.dropTargetType.value === 'group' &&
-    drag.dropPosition.value === 'before' &&
-    drag.dragId.value !== props.group.id
-)
-
-const showGroupIndicatorAfter = computed(
-  () =>
-    drag.isDraggingGroup.value &&
-    drag.dropTargetId.value === props.group.id &&
-    drag.dropTargetType.value === 'group' &&
-    drag.dropPosition.value === 'after' &&
-    drag.dragId.value !== props.group.id
-)
-
-function handleContextMenu(e: MouseEvent): void {
-  e.preventDefault()
-  const items: ContextMenuEntry[] = [
-    { label: 'Edit Group...', action: () => uiStore.openEditGroupDialog(props.group.id) },
-    { label: 'Add Tab...', action: () => uiStore.openAddTabDialog(props.group.id) },
-    { separator: true },
-    {
-      label: 'Delete Group',
-      action: () => groupsStore.removeGroup(props.group.id)
-    }
-  ]
-  uiStore.showContextMenu(e.clientX, e.clientY, items)
-}
-
-function handleGroupDragStart(e: DragEvent): void {
-  e.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'group', id: props.group.id }))
-  e.dataTransfer!.effectAllowed = 'move'
-  requestAnimationFrame(() => {
-    drag.startGroupDrag(props.group.id)
-  })
-}
-
-// Header-specific dragover: handles both tab-into-group and group reorder
-function handleHeaderDragOver(e: DragEvent): void {
-  e.preventDefault()
-  e.stopPropagation()
-  e.dataTransfer!.dropEffect = 'move'
-
-  if (drag.isDraggingTab.value) {
-    drag.updateDropTarget(props.group.id, 'group', 'inside')
-  } else if (drag.isDraggingGroup.value && drag.dragId.value !== props.group.id) {
-    if (!groupHeaderEl.value) return
-    const pos = drag.positionFromEvent(e, groupHeaderEl.value)
-    drag.updateDropTarget(props.group.id, 'group', pos)
-  }
-}
-
-// Header drop: handles both tab-into-group and group reorder
-function handleHeaderDrop(e: DragEvent): void {
-  e.preventDefault()
-  e.stopPropagation()
-  const raw = e.dataTransfer?.getData('text/plain')
-  if (!raw) {
-    drag.reset()
-    return
-  }
-  try {
-    const data = JSON.parse(raw)
-    if (data.type === 'tab') {
-      groupsStore.moveTab(data.id, props.group.id, props.group.tabs.length)
-    } else if (data.type === 'group' && data.id !== props.group.id) {
-      const pos = groupHeaderEl.value ? drag.positionFromEvent(e, groupHeaderEl.value) : 'after'
-      const targetOrder = pos === 'before' ? props.group.order : props.group.order + 1
-      groupsStore.moveGroup(data.id, targetOrder)
-    }
-  } catch {
-    // ignore
-  }
-  drag.reset()
-}
-
-// Fallback dragover for the group body area (tab drops on empty space)
-function handleBodyDragOver(e: DragEvent): void {
-  e.preventDefault()
-  e.dataTransfer!.dropEffect = 'move'
-
-  if (drag.isDraggingTab.value) {
-    drag.updateDropTarget(props.group.id, 'group', 'inside')
-  }
-}
-
-// Fallback drop for the group body area
-function handleBodyDrop(e: DragEvent): void {
-  e.preventDefault()
-  const raw = e.dataTransfer?.getData('text/plain')
-  if (!raw) {
-    drag.reset()
-    return
-  }
-  try {
-    const data = JSON.parse(raw)
-    if (data.type === 'tab') {
-      groupsStore.moveTab(data.id, props.group.id, props.group.tabs.length)
-    }
-  } catch {
-    // ignore
-  }
-  drag.reset()
-}
-
-function handleDragEnd(): void {
-  drag.reset()
-}
-
-function handleDragLeave(e: DragEvent): void {
-  const relatedTarget = e.relatedTarget as HTMLElement | null
-  if (!groupHeaderEl.value?.contains(relatedTarget)) {
-    if (
-      drag.dropTargetId.value === props.group.id &&
-      drag.dropTargetType.value === 'group'
-    ) {
-      drag.clearDropTarget()
-    }
-  }
-}
-
-function handleMouseEnter(e: MouseEvent): void {
-  if (uiStore.sidebarExpanded) return
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  uiStore.showSidebarTooltip(props.group.name, rect.right + 8, rect.top + rect.height / 2)
-}
-
-function handleMouseLeave(): void {
-  uiStore.hideSidebarTooltip()
-}
+const isActiveSilo = computed(() => groupsStore.activeGroup?.id === props.group.id)
+const open = computed(() => !props.group.isCollapsed)
+const unread = computed(() => siloUnread(props.group))
+const sortedTabs = computed(() => [...props.group.tabs].sort((a, b) => a.order - b.order))
 </script>
 
 <template>
-  <div
-    class="mb-1 relative transition-opacity duration-200"
-    :class="isBeingDragged ? 'opacity-40' : ''"
-    :style="{ borderLeftColor: group.color }"
-    style="border-left-width: 3px"
-    @dragover="handleBodyDragOver"
-    @drop="handleBodyDrop"
+  <section
+    class="relative flex flex-col gap-px px-2 transition-opacity duration-200"
+    :class="dnd.isBeingDragged.value ? 'opacity-40' : ''"
+    :aria-label="group.name"
+    @dragover="dnd.onBodyDragover"
+    @drop="dnd.onBodyDrop"
   >
-    <!-- Group reorder indicator: before -->
     <div
-      v-if="showGroupIndicatorBefore"
-      class="absolute top-0 left-1 right-1 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
+      v-if="dnd.indicatorBefore.value"
+      class="pointer-events-none absolute -top-1 right-2 left-2 z-10 h-0.5 rounded-full bg-accent"
     />
 
     <div
-      ref="groupHeaderEl"
-      :class="[
-        'flex items-center py-1.5 cursor-pointer transition-colors',
-        uiStore.sidebarExpanded ? 'justify-between px-2' : 'justify-center px-1',
-        isDropHighlighted
-          ? 'bg-accent-muted ring-1 ring-accent-ring rounded'
-          : 'hover:bg-chrome-hover/50'
-      ]"
-      @click="groupsStore.toggleGroupCollapse(group.id)"
-      @contextmenu="handleContextMenu"
-      @mouseenter="handleMouseEnter"
-      @mouseleave="handleMouseLeave"
+      ref="headerEl"
       draggable="true"
-      @dragstart="handleGroupDragStart"
-      @dragover.stop="handleHeaderDragOver"
-      @drop.stop="handleHeaderDrop"
-      @dragend="handleDragEnd"
-      @dragleave="handleDragLeave"
+      class="flex h-8 items-center gap-0.5 rounded-[9px] pl-[7px] transition-colors"
+      :class="dnd.isDropHighlighted.value ? 'bg-accent-soft' : ''"
+      @contextmenu="openSiloMenu($event, group)"
+      @dragstart="dnd.onHeaderDragstart"
+      @dragover="dnd.onHeaderDragover"
+      @drop="dnd.onHeaderDrop"
+      @dragend="dnd.onDragend"
+      @dragleave="dnd.onDragleave"
     >
-      <div class="flex items-center gap-1.5 min-w-0" :class="!uiStore.sidebarExpanded ? 'w-full justify-center' : ''">
-        <svg
-          v-if="uiStore.sidebarExpanded"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          class="w-3 h-3 text-chrome-fg-secondary shrink-0 transition-transform duration-150"
-          :class="group.isCollapsed ? '-rotate-90' : ''"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-            clip-rule="evenodd"
-          />
-        </svg>
-        <span
-          v-if="uiStore.sidebarExpanded"
-          class="text-xs font-semibold text-chrome-fg-secondary truncate uppercase tracking-wider"
-        >
+      <button
+        type="button"
+        class="flex h-[30px] min-w-0 flex-1 items-center gap-[9px] text-left"
+        :aria-expanded="open"
+        :aria-label="group.name + (unread && !open ? `, ${unread} unread` : '')"
+        @click="groupsStore.toggleGroupCollapse(group.id)"
+      >
+        <SiloTile :silo="group" :size="20" :radius="6" :ring="isActiveSilo" />
+        <span class="truncate font-display text-[14px] font-bold tracking-[-0.01em] text-fg1">
           {{ group.name }}
         </span>
+        <AppIcon
+          name="chevron"
+          :size="12"
+          :stroke="2.2"
+          class="text-fg3 transition-transform duration-150"
+          :class="open ? '' : '-rotate-90'"
+        />
         <span
-          v-if="!uiStore.sidebarExpanded && group.iconEmoji"
-          class="w-6 h-6 rounded text-base flex items-center justify-center"
-          :title="group.name"
+          v-if="!open && unread"
+          class="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-badge px-[5px] text-[11px] font-semibold text-white"
         >
-          {{ group.iconEmoji }}
+          {{ formatBadge(unread) }}
         </span>
-        <span
-          v-if="!uiStore.sidebarExpanded && !group.iconEmoji"
-          class="w-6 h-6 rounded text-[11px] font-bold flex items-center justify-center text-white/90"
-          :style="{ backgroundColor: group.color }"
-          :title="group.name"
-        >
-          {{ group.name.charAt(0).toUpperCase() }}
-        </span>
-      </div>
+      </button>
       <button
-        v-if="uiStore.sidebarExpanded"
-        @click.stop="uiStore.openAddTabDialog(group.id)"
-        class="text-chrome-fg-muted hover:text-chrome-fg-primary text-sm leading-none shrink-0"
-        title="Add tab"
+        type="button"
+        class="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-fg3 transition-colors hover:bg-hover hover:text-fg1"
+        :aria-label="`Add tab to ${group.name}`"
+        :title="`Add tab to ${group.name}`"
+        @click="uiStore.openAddTabDialog(group.id)"
       >
-        +
+        <AppIcon name="plus" :size="14" :stroke="2.2" />
       </button>
     </div>
 
-    <TransitionGroup
-      v-if="!group.isCollapsed"
-      tag="div"
-      name="tab-list"
-      class="pb-1"
-    >
-      <SidebarTab v-for="tab in group.tabs" :key="tab.id" :tab="tab" />
-      <AddTabButton v-if="!uiStore.sidebarExpanded" :group-id="group.id" :key="'add'" />
+    <TransitionGroup v-if="open" tag="div" name="tab-list" class="flex flex-col gap-px">
+      <SidebarTab v-for="tab in sortedTabs" :key="tab.id" :tab="tab" />
     </TransitionGroup>
+    <button
+      v-if="open && group.tabs.length === 0"
+      type="button"
+      class="flex h-7 items-center rounded-[9px] pl-[36px] text-left text-[12px] text-fg3 transition-colors hover:bg-hover hover:text-fg2"
+      @click="uiStore.openAddTabDialog(group.id)"
+    >
+      No tabs yet — add one
+    </button>
 
-    <!-- Group reorder indicator: after -->
     <div
-      v-if="showGroupIndicatorAfter"
-      class="absolute bottom-0 left-1 right-1 h-0.5 bg-accent-soft rounded-full z-10 pointer-events-none"
+      v-if="dnd.indicatorAfter.value"
+      class="pointer-events-none absolute right-2 -bottom-1 left-2 z-10 h-0.5 rounded-full bg-accent"
     />
-  </div>
+  </section>
 </template>
