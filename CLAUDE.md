@@ -65,7 +65,10 @@ sign users out).
 
 ## Key Files
 - `electron.vite.config.ts` — Unified Vite config (main + preload + renderer)
-- `src/main/index.ts` — Main process entry, frameless BrowserWindow (traffic lights on macOS, title bar overlay on Windows/Linux), app menu + accelerators
+- `src/main/index.ts` — Main process entry, frameless BrowserWindow (traffic lights on macOS, title bar overlay on Windows/Linux), permissions, webview context menu
+- `src/main/menu.ts` — App menu + accelerators (each sends `shortcut:*` to the renderer), custom tab shortcuts, Ctrl+Tab handling
+- `src/preload/webview.ts` — Sandboxed webview preload: focus/dialog guards, external protocols, back/forward keys + mouse buttons, camera/mic relay
+- `src/preload/media-capture.ts` — Main-world getUserMedia/getDisplayMedia wrapper that reports camera/mic/screen use
 - `src/main/store.ts` — JSON file persistence; `normalizeState()` validates and migrates configs (startup + import)
 - `src/main/ipc-handlers.ts` — All IPC handler registrations (store, shell, dialog, window)
 - `src/preload/index.ts` — contextBridge API (window.api)
@@ -73,6 +76,8 @@ sign users out).
 - `src/renderer/src/stores/groups.ts` — Primary Pinia store (silos/groups, tabs, CRUD, reorder, notifications, sleep)
 - `src/renderer/src/stores/ui.ts` — UI state (sidebar + layout, dialogs, command bar, context menu, settings, theme)
 - `src/renderer/src/stores/topbar-tabs.ts` — Runtime-only store for child/topbar (pop-up) tabs
+- `src/renderer/src/stores/recently-closed.ts` — Runtime-only stack of closed pop-up tabs / removed sidebar tabs (⌘⇧T, ⌘L)
+- `src/renderer/src/utils/accelerator.ts` — Shortcut recording/formatting + the list of Silo's own (reserved) shortcuts
 - `src/renderer/src/types/index.ts` — Shared TypeScript interfaces
 - `src/renderer/src/utils/theme.ts` — Design tokens: shades, accents, silo colors, tint levels
 - `src/renderer/src/utils/silo-icons.ts` — Built-in silo icons, emoji quick picks, logo upload → data URL
@@ -101,17 +106,29 @@ sign users out).
   code-signing identity so notifications work in `pnpm dev`. Re-run after every Electron update.
 
 ## Keyboard Shortcuts
-Most are also app-menu accelerators so they work while a page has focus.
+Most are app-menu accelerators (`src/main/menu.ts`) so they work while a page has focus. Keep the menu,
+`RESERVED` in `utils/accelerator.ts` and the list in `SettingsPage.vue` in sync.
 - `Cmd/Ctrl+T` — Add new tab to the current silo
+- `Cmd/Ctrl+Shift+T` — Reopen the last closed pop-up tab or removed sidebar tab (with its pop-ups)
 - `Cmd/Ctrl+N` — Create new silo
 - `Cmd/Ctrl+W` — Close active child tab (asks before removing a primary sidebar tab)
-- `Cmd/Ctrl+R` — Reload active tab (child or main)
-- `Cmd/Ctrl+L` — Open the command bar (search tabs / enter address)
-- `Cmd/Ctrl+F` — Find in page
+- `Cmd/Ctrl+R` — Reload; `Cmd/Ctrl+Shift+R` (and Ctrl/Shift+F5) — reload ignoring cache; `F5` on Windows/Linux
+- `Cmd/Ctrl+.` — Stop loading (`Esc` too, when the app chrome has focus); the reload button turns into Stop
+- `Cmd/Ctrl+L` — Open the command bar (search tabs / recently closed / enter address)
+- `Cmd/Ctrl+F` — Find in page; `Cmd/Ctrl+G` / `+Shift+G` (F3 / Shift+F3) — find next / previous
+- `Cmd/Ctrl+P` — Print the page
 - `Cmd/Ctrl+[` or `]` — Toggle sidebar (renderer only; not a menu accelerator so pages keep it)
-- `Cmd/Ctrl+1-9` — Switch to Nth tab
+- `Cmd/Ctrl+1-8` — Nth tab of the current silo; `Cmd/Ctrl+9` — its last tab
+- `Ctrl+1-9` (macOS) / `Alt+1-9` (Windows/Linux) — Nth silo, back on its last-used tab
+- `Ctrl+Tab` / `Ctrl+Shift+Tab`, `Cmd+Opt+→/←`, `Cmd+Shift+]/[` (mac), `Ctrl+PgDn/PgUp` — next / previous tab in the
+  current silo. Ctrl+Tab is caught in `before-input-event` (not an NSMenu key equivalent).
+- `Cmd+←/→` (mac) / `Alt+←/→` — Back / forward, only when not typing in a field (webview preload + App.vue).
+  Mouse side buttons too; three-finger swipe via the window `swipe` event.
+- Custom per-tab shortcuts (Edit tab / Settings › Shortcuts) — stored as `TabItem.shortcut` (Electron accelerator),
+  registered as hidden menu items via `menu:set-tab-shortcuts`. They work from any silo.
+- `Cmd+Opt+I` / `Ctrl+Shift+I` — DevTools for the page; `+Shift` — Silo's own DevTools
 - `Cmd/Ctrl+,` — Open settings
-- `Escape` — Close the topmost layer (context menu, command bar, dialogs, find bar, settings)
+- `Escape` — Close the topmost layer (context menu, command bar, dialogs, find bar, settings), else stop loading
 
 ## IPC Channels
 - `store:get-state` — Returns full AppState
@@ -128,11 +145,12 @@ Most are also app-menu accelerators so they work while a page has focus.
 - `shell:open-external` — Opens URL in system browser
 - `dialog:export-config` — Export config to JSON file
 - `dialog:import-config` — Import config from JSON file
+- `menu:set-tab-shortcuts` — Custom tab shortcuts → hidden app-menu items
 
 ## Conventions
 - Component names: `TheSidebar.vue` for singletons, `SidebarGroup.vue` for reusable
 - Pinia stores: Composition API style with `defineStore('name', () => {})`
-- IPC channels prefixed: `store:`, `shell:`, `dialog:`, `window:`
+- IPC channels prefixed: `store:`, `shell:`, `dialog:`, `window:`, `menu:`; main → renderer menu accelerators use `shortcut:`
 - UUID generation: `crypto.randomUUID()` (available in Electron's renderer)
 - Tailwind only in renderer (not main/preload)
 - Types shared via `src/renderer/src/types/index.ts`
@@ -143,7 +161,16 @@ Most are also app-menu accelerators so they work while a page has focus.
 - The `<webview>` partition attribute MUST be set before first navigation
 - `webviewTag: true` must be in BrowserWindow webPreferences or webviews silently fail
 - Persistence runs ONLY in the main process; renderer accesses it via IPC
-- Tab `isLoaded`, `notificationCount`, `currentUrl`, `currentTitle` are runtime-only state
+- Tab `isLoaded`, `notificationCount`, `currentUrl`, `currentTitle`, `capture`, `isLoading` are runtime-only state
+- Camera / mic / screen-share use is detected in the page (`src/preload/media-capture.ts`, injected into the main
+  world by the webview preload and into sub-frames by the main process) and sent to the host as `media-capture`.
+  `useTabStatus` ORs a tab's state with its pop-up tabs', so a call in a pop-up shows on its sidebar tab and silo.
+  Tabs on a call or playing audio never go to sleep (`isTabBusy`).
+- Every awake tab or pop-up is a full renderer process (~100–500 MB), so:
+  - New tabs sleep after 1 hour by default (`defaultSleepAfterMinutes: 60`). Configs from before v2.1 stored
+    "never" and are switched once in `normalizeState`; `sleepDefaultMigrated` keeps a later "Never" choice.
+  - Pop-up tabs restored from the last session load when first shown (`ChildTab.isLoaded`, `loadedChildTabs`).
+  - When a tab sleeps, its pop-ups are unloaded (`unloadChildTabs`), not deleted; they reload when clicked.
 - When deleting a group, call `session.fromPartition(partition).clearStorageData()`
 - Groups support optional `userAgent` field for custom user agent per group
 - Groups have an optional `icon: { kind: 'letter' | 'emoji' | 'icon' | 'image', value }`; uploaded logos are stored as data URLs in the config. Legacy `iconEmoji` is migrated on load.

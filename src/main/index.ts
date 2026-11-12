@@ -8,12 +8,13 @@ import {
   desktopCapturer,
   nativeTheme,
   ipcMain,
-  webContents,
   webFrameMain
 } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc-handlers'
+import { handleTabCycleKey, installAppMenu, sendShortcut } from './menu'
+import { MEDIA_CAPTURE_SUBFRAME_SCRIPT } from '../preload/media-capture'
 import { initAutoUpdater } from './updater'
 import { getCachedState, loadState, saveState, LIGHT_SHADE_HEX, DARK_SHADE_HEX } from './store'
 import icon from '../../resources/icon.png?asset'
@@ -59,6 +60,19 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // Ctrl+Tab / Ctrl+Shift+Tab while the app chrome has focus (webviews: see web-contents-created)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (handleTabCycleKey(input)) event.preventDefault()
+  })
+
+  // macOS trackpad swipe between pages. Electron only reports it when "Swipe between pages"
+  // is set to three fingers; the default two-finger swipe isn't exposed. Electron's 'left'
+  // is a swipe with deltaX > 0, which Chrome maps to Back (and 'right' to Forward).
+  mainWindow.on('swipe', (_event, direction) => {
+    if (direction === 'left') sendShortcut('shortcut:navigate', 'back')
+    else if (direction === 'right') sendShortcut('shortcut:navigate', 'forward')
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -290,8 +304,16 @@ ipcMain.on('silo:open-external-protocol', (_event, url: string) => {
 // Webview preloads override window.open() and route URLs here via IPC.
 // This prevents Electron's internal popup handling from activating the
 // parent BrowserWindow (which causes focus stealing from background).
-ipcMain.on('silo:window-open', (_event, url: string) => {
-  if (!url || typeof url !== 'string') return
+ipcMain.on('silo:window-open', (event, rawUrl: string) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return
+  // window.open() takes relative URLs ("/meeting/123"); resolve them against the page, or
+  // they'd look like an unknown protocol below and silently go nowhere
+  let url = rawUrl
+  try {
+    url = new URL(rawUrl, event.sender.getURL()).href
+  } catch {
+    // not resolvable — use as is
+  }
   if (isExternalProtocol(url)) {
     openExternalDedup(url)
     return
@@ -300,7 +322,8 @@ ipcMain.on('silo:window-open', (_event, url: string) => {
   if (state.openLinksInNewTab) {
     const win = BrowserWindow.getAllWindows()[0]
     if (win) {
-      win.webContents.send('webview-context:open-in-new-tab', url)
+      // The sender's id lets the renderer attach the pop-up to the tab that opened it
+      win.webContents.send('webview-context:open-in-new-tab', url, event.sender.id)
     }
   } else {
     shell.openExternal(url)
@@ -339,20 +362,32 @@ const NOTIF_CLICK_SUBFRAME_SCRIPT = `
 })()
 `
 
+// Both sub-frame scripts in one call per frame (pages with many iframes load lots of them).
+// Each is guarded so one failing doesn't skip the other.
+const SUBFRAME_SCRIPT = `try { ${NOTIF_CLICK_SUBFRAME_SCRIPT} } catch (e) {}
+try { ${MEDIA_CAPTURE_SUBFRAME_SCRIPT} } catch (e) {}`
+
 // Intercept webview context menus and new-window requests
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     // Set up permission handlers for this webview's session
     setupPermissionHandlers(contents.session)
 
-    // Inject notification-click override into child frames (cross-origin iframes
-    // like JSFiddle results) so Notification clicks can route back to Silo.
+    // Inject into child frames (cross-origin iframes like JSFiddle results or embedded call
+    // widgets): the notification-click override, so Notification clicks route back to Silo,
+    // and camera/mic tracking, so a call inside an iframe still shows on the tab.
+    // The main frame gets both from the webview preload / notification injection.
     contents.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
       if (isMainFrame) return
       try {
         const frame = webFrameMain.fromId(processId, routingId)
-        if (frame) frame.executeJavaScript(NOTIF_CLICK_SUBFRAME_SCRIPT).catch(() => {})
+        if (frame) frame.executeJavaScript(SUBFRAME_SCRIPT).catch(() => {})
       } catch {}
+    })
+
+    // Ctrl+Tab / Ctrl+Shift+Tab → next / previous tab, even while the page has focus
+    contents.on('before-input-event', (event, input) => {
+      if (handleTabCycleKey(input)) event.preventDefault()
     })
 
     // ── External protocol handling (mailto:, tel:, msteams://, zoommtg://, etc.) ──
@@ -381,7 +416,7 @@ app.on('web-contents-created', (_event, contents) => {
         // still routed correctly when the window is in the background
         const win = BrowserWindow.getAllWindows()[0]
         if (win) {
-          win.webContents.send('webview-context:open-in-new-tab', url)
+          win.webContents.send('webview-context:open-in-new-tab', url, contents.id)
         }
       } else {
         shell.openExternal(url)
@@ -391,73 +426,120 @@ app.on('web-contents-created', (_event, contents) => {
 
     contents.on('context-menu', (_e, params) => {
       const menu = new Menu()
+      const add = (options: Electron.MenuItemConstructorOptions): void =>
+        menu.append(new MenuItem(options))
+      const separator = (): void => {
+        const last = menu.items[menu.items.length - 1]
+        if (last && last.type !== 'separator') add({ type: 'separator' })
+      }
+      const openInNewTab = (url: string): void => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send(
+          'webview-context:open-in-new-tab',
+          url,
+          contents.id
+        )
+      }
+
+      // Spelling: suggestions for the word under the cursor
+      if (params.isEditable && params.misspelledWord) {
+        for (const suggestion of params.dictionarySuggestions.slice(0, 5)) {
+          add({
+            label: suggestion,
+            click: () => contents.replaceMisspelling(suggestion)
+          })
+        }
+        if (params.dictionarySuggestions.length === 0) {
+          add({ label: 'No Spelling Suggestions', enabled: false })
+        }
+        add({
+          label: 'Add to Dictionary',
+          click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        })
+        separator()
+      }
 
       if (params.linkURL) {
         const isProtocolLink = isExternalProtocol(params.linkURL)
         if (!isProtocolLink) {
-          menu.append(
-            new MenuItem({
-              label: 'Open Link in New Tab',
-              click: () => {
-                const win = BrowserWindow.getFocusedWindow()
-                if (win) {
-                  win.webContents.send('webview-context:open-in-new-tab', params.linkURL)
-                }
-              }
-            })
-          )
+          add({ label: 'Open Link in New Tab', click: () => openInNewTab(params.linkURL) })
         }
-        menu.append(
-          new MenuItem({
-            label: isProtocolLink ? 'Open in App' : 'Open in Default Browser',
+        add({
+          label: isProtocolLink ? 'Open in App' : 'Open in Default Browser',
+          click: () => {
+            shell.openExternal(params.linkURL)
+          }
+        })
+        add({
+          label: 'Copy Link Address',
+          click: () => {
+            clipboard.writeText(params.linkURL).catch(() => {})
+          }
+        })
+        const linkText = params.linkText?.trim()
+        if (linkText && linkText !== params.linkURL) {
+          add({
+            label: 'Copy Link Text',
             click: () => {
-              shell.openExternal(params.linkURL)
+              clipboard.writeText(linkText).catch(() => {})
             }
           })
-        )
-        menu.append(
-          new MenuItem({
-            label: 'Copy Link Address',
-            click: () => {
-              clipboard.writeText(params.linkURL).catch(() => {})
-            }
-          })
-        )
-        menu.append(new MenuItem({ type: 'separator' }))
+        }
+        separator()
       }
 
-      if (params.isEditable) {
-        menu.append(new MenuItem({ role: 'undo' }))
-        menu.append(new MenuItem({ role: 'redo' }))
-        menu.append(new MenuItem({ type: 'separator' }))
-        menu.append(new MenuItem({ role: 'cut' }))
-        menu.append(new MenuItem({ role: 'copy' }))
-        menu.append(new MenuItem({ role: 'paste' }))
-        menu.append(new MenuItem({ role: 'selectAll' }))
-      } else if (params.selectionText) {
-        menu.append(new MenuItem({ role: 'copy' }))
-      } else if (!params.linkURL) {
-        menu.append(
-          new MenuItem({
-            label: 'Back',
-            enabled: contents.navigationHistory.canGoBack(),
-            click: () => contents.navigationHistory.goBack()
+      if (params.mediaType === 'image' && params.srcURL) {
+        const src = params.srcURL
+        if (/^https?:/i.test(src)) {
+          add({ label: 'Open Image in New Tab', click: () => openInNewTab(src) })
+        }
+        add({ label: 'Save Image As…', click: () => contents.downloadURL(src) })
+        add({ label: 'Copy Image', click: () => contents.copyImageAt(params.x, params.y) })
+        if (!src.startsWith('data:')) {
+          add({
+            label: 'Copy Image Address',
+            click: () => {
+              clipboard.writeText(src).catch(() => {})
+            }
           })
-        )
-        menu.append(
-          new MenuItem({
-            label: 'Forward',
-            enabled: contents.navigationHistory.canGoForward(),
-            click: () => contents.navigationHistory.goForward()
-          })
-        )
-        menu.append(
-          new MenuItem({
-            label: 'Reload',
-            click: () => contents.reload()
-          })
-        )
+        }
+        separator()
       }
+
+      const selection = params.selectionText.trim()
+      if (params.isEditable) {
+        add({ role: 'undo' })
+        add({ role: 'redo' })
+        add({ type: 'separator' })
+        add({ role: 'cut' })
+        add({ role: 'copy' })
+        add({ role: 'paste' })
+        add({ role: 'selectAll' })
+      } else if (selection) {
+        add({ role: 'copy' })
+        const short = selection.length > 24 ? `${selection.slice(0, 24)}…` : selection
+        add({
+          label: `Search Google for “${short.replace(/\s+/g, ' ')}”`,
+          click: () =>
+            openInNewTab(`https://www.google.com/search?q=${encodeURIComponent(selection)}`)
+        })
+      } else if (!params.linkURL && params.mediaType !== 'image') {
+        add({
+          label: 'Back',
+          enabled: contents.navigationHistory.canGoBack(),
+          click: () => contents.navigationHistory.goBack()
+        })
+        add({
+          label: 'Forward',
+          enabled: contents.navigationHistory.canGoForward(),
+          click: () => contents.navigationHistory.goForward()
+        })
+        add({ label: 'Reload', click: () => contents.reload() })
+        add({ type: 'separator' })
+        add({ label: 'Print…', click: () => contents.print() })
+      }
+
+      separator()
+      add({ label: 'Inspect', click: () => contents.inspectElement(params.x, params.y) })
 
       const win = BrowserWindow.getFocusedWindow()
       if (win) {
@@ -476,178 +558,19 @@ app.whenReady().then(() => {
     website: 'https://silo.dev'
   })
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  // Dev only: F12 toggles Silo's own DevTools. optimizer.watchWindowShortcuts() isn't used:
+  // in production it swallows ⌘R, ⌘⇧R, ⌥⌘I and ⌘−/⌘+ in before-input-event, which also
+  // blocks our menu accelerators for those keys whenever the app chrome has focus.
+  if (is.dev) {
+    app.on('browser-window-created', (_, window) => {
+      window.webContents.on('before-input-event', (_event, input) => {
+        if (input.type === 'keyDown' && input.code === 'F12') window.webContents.toggleDevTools()
+      })
+    })
+  }
 
-  // Full default menu with Cmd+W overridden to close tab instead of window
-  const menuTemplate: Electron.MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin'
-      ? [
-          {
-            label: app.name,
-            submenu: [
-              { role: 'about' as const },
-              { type: 'separator' as const },
-              { role: 'services' as const },
-              { type: 'separator' as const },
-              { role: 'hide' as const },
-              { role: 'hideOthers' as const },
-              { role: 'unhide' as const },
-              { type: 'separator' as const },
-              { role: 'quit' as const }
-            ]
-          }
-        ]
-      : []),
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'New Tab',
-          accelerator: 'CmdOrCtrl+T',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:new-tab')
-          }
-        },
-        {
-          label: 'New Silo',
-          accelerator: 'CmdOrCtrl+N',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:new-group')
-          }
-        },
-        {
-          label: 'Open Location…',
-          accelerator: 'CmdOrCtrl+L',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:command-bar')
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Close Tab',
-          accelerator: 'CmdOrCtrl+W',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:close-tab')
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Settings',
-          accelerator: 'CmdOrCtrl+,',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:open-settings')
-          }
-        }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        {
-          label: 'Paste and Match Style',
-          accelerator: 'CmdOrCtrl+Shift+V',
-          click: (): void => {
-            const focused = webContents.getAllWebContents().find((wc) => wc.isFocused())
-            if (focused) focused.pasteAndMatchStyle()
-          }
-        },
-        { role: 'delete' },
-        { type: 'separator' },
-        { role: 'selectAll' },
-        { type: 'separator' },
-        {
-          label: 'Find',
-          accelerator: 'CmdOrCtrl+F',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:find')
-          }
-        }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        {
-          label: 'Reload Tab',
-          accelerator: 'CmdOrCtrl+R',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:reload-tab')
-          }
-        },
-        {
-          label: 'Force Reload Tab',
-          accelerator: 'CmdOrCtrl+Shift+R',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:reload-tab')
-          }
-        },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        // Go to tab 1–9 — menu accelerators so they also work while a page has focus
-        ...Array.from({ length: 9 }, (_, i) => ({
-          label: `Go to Tab ${i + 1}`,
-          accelerator: `CmdOrCtrl+${i + 1}`,
-          visible: false,
-          click: (_item: Electron.MenuItem, win: Electron.BaseWindow | undefined): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:go-to-tab', i)
-          }
-        })),
-        { type: 'separator' },
-        {
-          label: 'Zoom In',
-          accelerator: 'CmdOrCtrl+=',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-in')
-          }
-        },
-        {
-          label: 'Zoom In (Plus)',
-          accelerator: 'CmdOrCtrl+Shift+=',
-          visible: false,
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-in')
-          }
-        },
-        {
-          label: 'Zoom Out',
-          accelerator: 'CmdOrCtrl+-',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-out')
-          }
-        },
-        {
-          label: 'Actual Size',
-          accelerator: 'CmdOrCtrl+0',
-          click: (_item, win): void => {
-            if (win) (win as BrowserWindow).webContents.send('shortcut:zoom-reset')
-          }
-        },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    { role: 'windowMenu' },
-    {
-      role: 'help',
-      submenu: [
-        {
-          label: 'Learn More',
-          click: (): void => {
-            shell.openExternal('https://silo.dev')
-          }
-        }
-      ]
-    }
-  ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate))
+  // App menu: most shortcuts are menu accelerators (see menu.ts)
+  installAppMenu()
 
   // Strip "Electron/X.X.X" and app name from the default User Agent so sites
   // like WhatsApp, which check for "Chrome 85+", see a normal Chrome UA.

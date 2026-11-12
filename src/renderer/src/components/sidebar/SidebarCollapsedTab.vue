@@ -3,7 +3,13 @@ import { computed, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTabDnd } from '@renderer/composables/useSidebarDnd'
-import { formatBadge, useSiloMenus, useTabStatus } from '@renderer/composables/useSiloMenus'
+import {
+  captureLabel,
+  formatBadge,
+  useSiloMenus,
+  useTabStatus
+} from '@renderer/composables/useSiloMenus'
+import { useTabShortcut } from '@renderer/composables/useTabShortcut'
 import type { GroupItem, TabItem } from '@renderer/types'
 import TabIcon from '@renderer/components/common/TabIcon.vue'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
@@ -19,9 +25,13 @@ const { openTabMenu } = useSiloMenus()
 const el = ref<HTMLElement | null>(null)
 const dnd = useTabDnd(() => props.tab, el)
 const status = useTabStatus(() => props.tab)
+const hint = useTabShortcut(() => props.tab)
 const isActive = computed(() => groupsStore.activeTabId === props.tab.id)
 
 const STATUS_ICON: Record<NonNullable<typeof status.value.primary>, AppIconName> = {
+  camera: 'camera',
+  mic: 'mic',
+  screen: 'screen-share',
   audio: 'audio-small',
   muted: 'muted',
   bell: 'bell-off',
@@ -31,11 +41,14 @@ const STATUS_ICON: Record<NonNullable<typeof status.value.primary>, AppIconName>
 const tooltipSub = computed(() => {
   const s = status.value
   const parts = [props.group.name]
+  const live = captureLabel(s)
+  if (live) parts.push(live)
   if (s.badge) parts.push(`${s.badge} unread`)
   if (s.asleep) parts.push('asleep, click to wake')
   else if (s.audio) parts.push('playing audio')
   else if (s.muted) parts.push('muted')
   else if (s.bellOff) parts.push('notifications off')
+  if (hint.value.label) parts.push(hint.value.label)
   return parts.join(' · ')
 })
 
@@ -55,8 +68,13 @@ function showTooltip(e: MouseEvent): void {
       ref="el"
       type="button"
       draggable="true"
-      :aria-label="`${tab.name} in ${group.name}` + (status.badge ? `, ${status.badge} notifications` : '')"
+      :aria-label="
+        `${tab.name} in ${group.name}` +
+        (captureLabel(status) ? `, ${captureLabel(status)}` : '') +
+        (status.badge ? `, ${status.badge} notifications` : '')
+      "
       :aria-current="isActive ? 'page' : undefined"
+      :aria-keyshortcuts="hint.aria || undefined"
       class="relative flex h-9 w-10 items-center justify-center rounded-[10px] transition-[background-color,opacity] duration-150"
       :class="[
         isActive ? 'bg-tab-on shadow-tab-on' : 'hover:bg-hover active:bg-press',
@@ -91,7 +109,13 @@ function showTooltip(e: MouseEvent): void {
         v-if="status.primary"
         aria-hidden="true"
         class="absolute right-[3px] bottom-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-chrome"
-        :class="status.primary === 'audio' ? 'bg-accent text-on-accent' : 'bg-[var(--status-ink)] text-white'"
+        :class="
+          status.camera || status.mic || status.screen
+            ? 'bg-badge text-white'
+            : status.primary === 'audio'
+              ? 'bg-accent text-on-accent'
+              : 'bg-[var(--status-ink)] text-white'
+        "
       >
         <AppIcon :name="STATUS_ICON[status.primary]" :size="8" :stroke="3" />
       </span>

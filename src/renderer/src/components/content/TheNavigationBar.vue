@@ -9,6 +9,7 @@ import type { ChildTab } from '@renderer/types'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
 import TabIcon from '@renderer/components/common/TabIcon.vue'
+import CaptureIcons from '@renderer/components/common/CaptureIcons.vue'
 
 // The 44px title row: back / forward / reload / home, pop-up tabs, the address button
 // (opens the command bar) and "open in default browser". Doubles as the window drag area.
@@ -83,8 +84,16 @@ function goForward(): void {
   getActiveWebview()?.goForward()
 }
 
-function reload(): void {
-  getActiveWebview()?.reload()
+const isLoading = computed(() =>
+  activeChild.value ? !!activeChild.value.isLoading : !!tab.value?.isLoading
+)
+
+// The reload button turns into Stop while the page loads, like Chrome
+function reloadOrStop(): void {
+  const wv = getActiveWebview()
+  if (!wv) return
+  if (isLoading.value) wv.stop()
+  else wv.reload()
 }
 
 function goHome(): void {
@@ -146,11 +155,12 @@ const navButton =
       <button
         type="button"
         :class="navButton"
-        aria-label="Reload"
-        :title="`Reload (${shortcut('R')})`"
-        @click="reload"
+        :aria-label="isLoading ? 'Stop loading' : 'Reload'"
+        :title="isLoading ? `Stop loading (${shortcut('.')})` : `Reload (${shortcut('R')})`"
+        @click="reloadOrStop"
       >
-        <AppIcon name="reload" :size="15" :stroke="2" />
+        <AppIcon v-if="isLoading" name="close" :size="14" :stroke="2.2" />
+        <AppIcon v-else name="reload" :size="15" :stroke="2" />
       </button>
       <button
         type="button"
@@ -194,6 +204,7 @@ const navButton =
             >
               {{ tab.name }}
             </span>
+            <CaptureIcons v-if="tab.capture" :capture="tab.capture" :size="13" />
           </button>
         </div>
         <div
@@ -226,6 +237,7 @@ const navButton =
             >
               {{ childLabel(child) }}
             </span>
+            <CaptureIcons v-if="child.capture" :capture="child.capture" :size="13" />
             <AppIcon
               v-if="child.isAudioPlaying"
               name="audio-small"

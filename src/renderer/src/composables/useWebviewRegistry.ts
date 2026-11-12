@@ -29,6 +29,26 @@ export function useWebviewRegistry() {
     return childWebviews.get(childTabId) ?? null
   }
 
+  /** Which tab owns a webContents (e.g. the page that called window.open). */
+  function findByWebContentsId(
+    webContentsId: number
+  ): { kind: 'main'; tabId: string } | { kind: 'child'; childId: string } | null {
+    const idOf = (wv: Electron.WebviewTag): number | null => {
+      try {
+        return wv.getWebContentsId()
+      } catch {
+        return null // not attached yet
+      }
+    }
+    for (const [tabId, wv] of mainWebviews) {
+      if (idOf(wv) === webContentsId) return { kind: 'main', tabId }
+    }
+    for (const [childId, wv] of childWebviews) {
+      if (idOf(wv) === webContentsId) return { kind: 'child', childId }
+    }
+    return null
+  }
+
   function getActive(
     activeTabId: string | null,
     activeChildTabId: string | null
@@ -45,6 +65,7 @@ export function useWebviewRegistry() {
     unregisterChild,
     getMain,
     getChild,
-    getActive
+    getActive,
+    findByWebContentsId
   }
 }

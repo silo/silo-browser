@@ -10,12 +10,7 @@ import AppIcon from '@renderer/components/common/AppIcon.vue'
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 
-const silo = computed(
-  () =>
-    (uiStore.railSiloId && groupsStore.findGroup(uiStore.railSiloId)) ||
-    groupsStore.sortedGroups[0] ||
-    null
-)
+const silo = computed(() => groupsStore.currentGroup)
 const otherSilos = computed(() =>
   groupsStore.sortedGroups.filter((g) => g.id !== silo.value?.id).map((g) => g.name)
 )

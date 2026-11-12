@@ -15,13 +15,7 @@ const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const { openSiloMenuAt } = useSiloMenus()
 
-const selected = computed<GroupItem | null>(() => {
-  if (uiStore.railSiloId) {
-    const g = groupsStore.findGroup(uiStore.railSiloId)
-    if (g) return g
-  }
-  return groupsStore.activeGroup ?? groupsStore.sortedGroups[0] ?? null
-})
+const selected = computed<GroupItem | null>(() => groupsStore.currentGroup)
 
 // Welcome screen (no silos yet): preview the first silo while it's being named
 const isEmpty = computed(() => groupsStore.groups.length === 0)
@@ -38,12 +32,7 @@ watch(
 )
 
 function selectSilo(group: GroupItem): void {
-  uiStore.setRailSilo(group.id)
-  const lastId = groupsStore.lastTabBySilo[group.id]
-  const target =
-    (lastId && group.tabs.find((t) => t.id === lastId)) ||
-    [...group.tabs].sort((a, b) => a.order - b.order)[0]
-  if (target && target.id !== groupsStore.activeTabId) groupsStore.activateTab(target.id)
+  groupsStore.openSilo(group.id)
 }
 
 function openOptions(e: MouseEvent): void {

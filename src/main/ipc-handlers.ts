@@ -3,6 +3,7 @@ import { readFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { getCachedState, normalizeState, saveState } from './store'
 import { checkForUpdates, quitAndInstall, openReleasesPage } from './updater'
+import { setTabShortcuts } from './menu'
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => {
@@ -11,6 +12,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('store:get-state', () => {
     return getCachedState()
+  })
+
+  // Custom per-tab shortcuts become hidden app-menu items (see menu.ts)
+  ipcMain.handle('menu:set-tab-shortcuts', (_event, shortcuts: unknown) => {
+    setTabShortcuts(shortcuts)
   })
 
   ipcMain.handle('store:save-groups', async (_event, groups: unknown[]) => {

@@ -1,4 +1,13 @@
-import { ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import { installMediaCaptureTracking } from './media-capture'
+
+// Camera / mic / screen-share tracking, installed in the page's main world before any page
+// script runs (see media-capture.ts). Frames report through postMessage, handled below.
+try {
+  contextBridge.executeInMainWorld({ func: installMediaCaptureTracking, args: ['self'] })
+} catch {
+  // e.g. a page without a main world yet — tracking is best-effort
+}
 
 // Prevent web content from stealing OS-level focus.
 // In a real browser, window.focus() is a no-op for background tabs.
@@ -57,6 +66,9 @@ window.addEventListener('message', (e) => {
   if (e.data?.type === '__silo_window_open' && e.data.url) {
     ipcRenderer.send('silo:window-open', e.data.url)
   }
+  if (e.data?.type === '__silo_media_capture' && typeof e.data.frameId === 'string') {
+    onFrameCapture(e.data.frameId, e.data.state)
+  }
   if (e.data?.type === '__silo_notification_click') {
     const tabId = e.data.tabId || document.documentElement.dataset.siloTabId
     if (tabId) {
@@ -64,6 +76,85 @@ window.addEventListener('message', (e) => {
       ipcRenderer.sendToHost('notification-click', tabId)
     }
   }
+})
+
+// ── Camera / mic / screen share: combine every frame's state and tell the host ──
+type CaptureState = { camera: boolean; mic: boolean; screen: boolean }
+const captureByFrame = new Map<string, CaptureState>()
+let lastCapture = ''
+
+function onFrameCapture(frameId: string, raw: unknown): void {
+  const s = (raw ?? {}) as Partial<CaptureState>
+  const state = { camera: !!s.camera, mic: !!s.mic, screen: !!s.screen }
+  if (state.camera || state.mic || state.screen) captureByFrame.set(frameId, state)
+  else captureByFrame.delete(frameId)
+  const combined = { camera: false, mic: false, screen: false }
+  captureByFrame.forEach((c) => {
+    combined.camera ||= c.camera
+    combined.mic ||= c.mic
+    combined.screen ||= c.screen
+  })
+  const key = JSON.stringify(combined)
+  if (key === lastCapture) return
+  lastCapture = key
+  ipcRenderer.sendToHost('media-capture', combined)
+}
+
+// ── Back / forward like Chrome ──
+// ⌘← / ⌘→ (macOS) and Alt+← / Alt+→ (Windows/Linux), but only when not typing in a field and
+// the page didn't handle the key itself. Listening on window (bubble phase) runs after the
+// page's own handlers. Mouse side buttons (3 = back, 4 = forward) too.
+const IS_MAC = process.platform === 'darwin'
+const NON_TEXT_INPUTS = new Set([
+  'button',
+  'checkbox',
+  'radio',
+  'submit',
+  'reset',
+  'range',
+  'color',
+  'file',
+  'image'
+])
+
+function isEditable(el: Element | null): boolean {
+  if (!el) return false
+  if ((el as HTMLElement).isContentEditable) return true
+  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true
+  if (el.tagName === 'INPUT') return !NON_TEXT_INPUTS.has((el as HTMLInputElement).type)
+  return false
+}
+
+const MOD_KEY = IS_MAC ? 'Meta' : 'Control'
+
+window.addEventListener('keydown', (e) => {
+  // Holding ⌘ / Ctrl shows the tab shortcut hints in the sidebar
+  if (e.key === MOD_KEY) {
+    if (!e.repeat) ipcRenderer.sendToHost('silo:modifier', true)
+    return
+  }
+  if (IS_MAC ? e.metaKey : e.ctrlKey) ipcRenderer.sendToHost('silo:modifier', false)
+
+  if (e.defaultPrevented || e.shiftKey) return
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+  const navChord = IS_MAC
+    ? e.metaKey && !e.altKey && !e.ctrlKey
+    : e.altKey && !e.ctrlKey && !e.metaKey
+  if (!navChord || isEditable(document.activeElement)) return
+  e.preventDefault()
+  ipcRenderer.sendToHost('silo:nav', e.key === 'ArrowLeft' ? 'back' : 'forward')
+})
+
+window.addEventListener('keyup', (e) => {
+  if (e.key === MOD_KEY) ipcRenderer.sendToHost('silo:modifier', false)
+})
+
+window.addEventListener('blur', () => ipcRenderer.sendToHost('silo:modifier', false))
+
+window.addEventListener('mouseup', (e) => {
+  if (e.button !== 3 && e.button !== 4) return
+  e.preventDefault()
+  ipcRenderer.sendToHost('silo:nav', e.button === 3 ? 'back' : 'forward')
 })
 
 // Ctrl+scroll (and trackpad pinch) zoom — relay to parent renderer

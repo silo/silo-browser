@@ -35,7 +35,7 @@ const uiStore = useUiStore()
         :is-active="tab.id === groupsStore.activeTabId && !topbarStore.isChildActive"
       />
       <ChildWebviewContainer
-        v-for="child in topbarStore.childTabs"
+        v-for="child in topbarStore.loadedChildTabs"
         :key="child.id"
         :child-tab="child"
         :is-active="

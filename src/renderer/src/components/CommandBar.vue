@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useRecentlyClosedStore } from '@renderer/stores/recently-closed'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { altShortcut, isMac, shortcut } from '@renderer/utils/platform'
 import type { GroupItem, TabItem } from '@renderer/types'
@@ -12,10 +13,12 @@ import TabIcon from '@renderer/components/common/TabIcon.vue'
 import type { AppIconName } from '@renderer/utils/icons'
 
 // ⌘L command bar (design board "C · Command bar"): search open tabs in every silo,
-// open an address in the current tab, or add it as a new tab to the current silo.
+// reopen recently closed tabs, open an address in the current tab, or add it as a new tab
+// to the current silo.
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
+const recentlyClosed = useRecentlyClosedStore()
 const webviewRegistry = useWebviewRegistry()
 
 const query = ref('')
@@ -23,16 +26,21 @@ const selected = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 
-const currentSilo = computed<GroupItem | null>(
-  () =>
-    (uiStore.railSiloId && groupsStore.findGroup(uiStore.railSiloId)) ||
-    groupsStore.activeGroup ||
-    groupsStore.sortedGroups[0] ||
-    null
-)
+const currentSilo = computed<GroupItem | null>(() => groupsStore.currentGroup)
 
 type Item =
   | { kind: 'tab'; id: string; tab: TabItem; silo: GroupItem; title: string; sub: string }
+  | {
+      kind: 'closed'
+      id: string
+      entryId: string
+      silo: GroupItem
+      title: string
+      sub: string
+      url: string
+      iconUrl?: string
+      iconEmoji?: string
+    }
   | {
       kind: 'go' | 'add' | 'search'
       id: string
@@ -131,6 +139,33 @@ const tabMatches = computed<Item[]>(() => {
     .map((r) => r.item)
 })
 
+// Closed pop-up tabs and removed sidebar tabs that can still come back (⌘⇧T reopens the newest)
+const closedItems = computed<Item[]>(() => {
+  const q = searchText.value
+  const out: Item[] = []
+  for (const entry of recentlyClosed.restorable()) {
+    const isChild = entry.kind === 'child'
+    const url = isChild ? entry.url : entry.tab.url
+    const title = isChild ? entry.title || hostOf(url) : entry.tab.name
+    const silo = groupsStore.findGroup(isChild ? entry.groupId : entry.tab.groupId)
+    if (!silo) continue
+    if (q && !title.toLowerCase().includes(q) && !url.toLowerCase().includes(q)) continue
+    out.push({
+      kind: 'closed',
+      id: `closed:${entry.id}`,
+      entryId: entry.id,
+      silo,
+      title,
+      sub: `${isChild ? 'Pop-up tab' : 'Removed tab'} · ${hostOf(url)}`,
+      url,
+      iconUrl: isChild ? entry.iconUrl : entry.tab.iconUrl,
+      iconEmoji: isChild ? undefined : entry.tab.iconEmoji
+    })
+    if (out.length >= 8) break
+  }
+  return out
+})
+
 const goItems = computed<Item[]>(() => {
   const text = query.value.trim()
   if (!searchText.value) return []
@@ -167,6 +202,7 @@ const goItems = computed<Item[]>(() => {
 const sections = computed<Section[]>(() => {
   const out: Section[] = []
   if (tabMatches.value.length) out.push({ title: 'Switch to tab', items: tabMatches.value })
+  if (closedItems.value.length) out.push({ title: 'Recently closed', items: closedItems.value })
   if (goItems.value.length) out.push({ title: 'Go to', items: goItems.value })
   return out
 })
@@ -175,7 +211,9 @@ const flat = computed(() => sections.value.flatMap((s) => s.items))
 
 watch(flat, () => {
   // Prefer the address action when the query looks like a URL nobody has open yet
-  const firstGo = flat.value.findIndex((i) => i.kind !== 'tab')
+  const firstGo = flat.value.findIndex(
+    (i) => i.kind === 'go' || i.kind === 'add' || i.kind === 'search'
+  )
   const onlyWeakTabMatches = tabMatches.value.length === 0
   selected.value = onlyWeakTabMatches && firstGo >= 0 ? firstGo : 0
 })
@@ -211,6 +249,9 @@ function run(item: Item | undefined): void {
   if (item.kind === 'tab') {
     groupsStore.activateTab(item.tab.id)
     topbarStore.activateMainTab()
+    close()
+  } else if (item.kind === 'closed') {
+    recentlyClosed.reopen(item.entryId)
     close()
   } else if (item.kind === 'add') {
     addAsTab(item.url)
@@ -346,6 +387,14 @@ function indexOf(item: Item): number {
                 :icon-emoji="item.tab.iconEmoji"
                 :size="22"
               />
+              <TabIcon
+                v-else-if="item.kind === 'closed'"
+                :name="item.title"
+                :url="item.url"
+                :icon-url="item.iconUrl"
+                :icon-emoji="item.iconEmoji"
+                :size="22"
+              />
               <span
                 v-else
                 aria-hidden="true"
@@ -358,7 +407,7 @@ function indexOf(item: Item): number {
                 <span class="truncate text-[12px] text-fg2">{{ item.sub }}</span>
               </span>
               <span
-                v-if="item.kind === 'tab'"
+                v-if="item.kind === 'tab' || item.kind === 'closed'"
                 class="flex h-[22px] shrink-0 items-center gap-[5px] rounded-md px-2 text-[11.5px] font-semibold text-fg1"
                 :style="{ background: `color-mix(in srgb, ${item.silo.color} 16%, transparent)` }"
               >

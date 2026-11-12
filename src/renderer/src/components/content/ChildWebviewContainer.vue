@@ -5,6 +5,7 @@ import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
+import { usePageMessages } from '@renderer/composables/usePageMessages'
 import type { ChildTab } from '@renderer/types'
 
 const props = defineProps<{
@@ -38,6 +39,7 @@ const handleFaviconUpdated = ((e: Event) => {
 const handleDidNavigate = ((e: Event) => {
   const evt = e as Event & { url: string }
   topbarStore.setChildCurrentUrl(props.childTab.id, evt.url)
+  topbarStore.setChildCapture(props.childTab.id, undefined)
 }) as EventListener
 
 const handleDidNavigateInPage = ((e: Event) => {
@@ -58,8 +60,29 @@ const handleIpcMessage = ((e: Event) => {
     applyWebviewZoom(evt.args?.[0] as string, props.childTab.parentTabId)
   } else if (evt.channel === 'silo:open-external' && evt.args?.[0]) {
     window.api.openExternal(evt.args[0] as string)
+  } else {
+    handleCommonIpc(evt.channel, evt.args)
   }
 }) as EventListener
+
+// Camera / mic state, back / forward keys and held ⌘ — same for main and pop-up tabs
+const handleCommonIpc = usePageMessages(
+  () => webviewRef.value,
+  (capture) => topbarStore.setChildCapture(props.childTab.id, capture)
+)
+
+function handleDidStartLoading(): void {
+  topbarStore.setChildLoading(props.childTab.id, true)
+}
+
+function handleDidStopLoading(): void {
+  topbarStore.setChildLoading(props.childTab.id, false)
+}
+
+// A new document (or a crashed one) can't still be capturing
+function resetCapture(): void {
+  topbarStore.setChildCapture(props.childTab.id, undefined)
+}
 
 const handleDidFailLoad = ((e: Event) => {
   const evt = e as Event & { errorDescription: string }
@@ -148,10 +171,15 @@ onMounted(() => {
   wv.addEventListener('media-paused', handleMediaPaused)
   wv.addEventListener('dom-ready', handleDomReady)
   wv.addEventListener('update-target-url', handleUpdateTargetUrl)
+  wv.addEventListener('did-start-loading', handleDidStartLoading)
+  wv.addEventListener('did-stop-loading', handleDidStopLoading)
+  wv.addEventListener('render-process-gone', resetCapture)
 })
 
 onUnmounted(() => {
   unregisterChild(props.childTab.id)
+  topbarStore.setChildCapture(props.childTab.id, undefined)
+  topbarStore.setChildLoading(props.childTab.id, false)
   const wv = webviewRef.value
   if (!wv) return
 
@@ -165,6 +193,9 @@ onUnmounted(() => {
   wv.removeEventListener('media-paused', handleMediaPaused)
   wv.removeEventListener('dom-ready', handleDomReady)
   wv.removeEventListener('update-target-url', handleUpdateTargetUrl)
+  wv.removeEventListener('did-start-loading', handleDidStartLoading)
+  wv.removeEventListener('did-stop-loading', handleDidStopLoading)
+  wv.removeEventListener('render-process-gone', resetCapture)
 })
 </script>
 

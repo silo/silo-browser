@@ -18,6 +18,17 @@ export interface TabItem {
   isAsleep?: boolean // Runtime-only — true when the sleep timer unloaded the tab
   zoomLevel: number // 0 = default (100%), persisted per-tab
   userAgent?: string
+  /** Custom keyboard shortcut (Electron accelerator, e.g. "Control+Alt+G"). Persisted. */
+  shortcut?: string
+  capture?: MediaCapture // Runtime-only — camera / mic / screen in use by the page
+  isLoading?: boolean // Runtime-only
+}
+
+/** What a page is capturing right now (camera, microphone, screen share). */
+export interface MediaCapture {
+  camera: boolean
+  mic: boolean
+  screen: boolean
 }
 
 /**
@@ -55,6 +66,12 @@ export interface ChildTab {
   currentTitle?: string
   iconUrl?: string
   isAudioPlaying?: boolean // Runtime-only — tracks media playback
+  capture?: MediaCapture // Runtime-only
+  isLoading?: boolean // Runtime-only
+  /** Runtime-only: the pop-up it was opened from, or null when opened from the sidebar tab itself */
+  openerId?: string | null
+  /** Runtime-only: its webview exists. Pop-ups restored from the last session load when first shown. */
+  isLoaded?: boolean
 }
 
 export type ThemeMode = 'dark' | 'light' | 'system'

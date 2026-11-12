@@ -28,7 +28,7 @@ export interface SiloApi {
   openExternal: (url: string) => Promise<void>
   exportConfig: () => Promise<string | null>
   importConfig: () => Promise<unknown | null>
-  onOpenInNewTab: (callback: (url: string) => void) => void
+  onOpenInNewTab: (callback: (url: string, sourceId?: number) => void) => void
   removeOpenInNewTabListener: () => void
   onUpdateDownloaded: (callback: (version: string) => void) => void
   removeUpdateDownloadedListener: () => void
@@ -69,6 +69,27 @@ export interface SiloApi {
   onDisplayMediaPick: (callback: (data: DisplayMediaPickRequest) => void) => void
   removeDisplayMediaPickListener: () => void
   respondToDisplayMediaPick: (requestId: number, sourceId: string | null) => void
+  setTabShortcuts: (shortcuts: { tabId: string; accelerator: string }[]) => Promise<void>
+  onActivateTab: (callback: (tabId: string) => void) => void
+  removeActivateTabListener: () => void
+  onReopenClosedTab: (callback: () => void) => void
+  removeReopenClosedTabListener: () => void
+  onGoToSilo: (callback: (index: number) => void) => void
+  removeGoToSiloListener: () => void
+  onCycleTab: (callback: (step: number) => void) => void
+  removeCycleTabListener: () => void
+  onNavigate: (callback: (direction: 'back' | 'forward') => void) => void
+  removeNavigateListener: () => void
+  onHardReload: (callback: () => void) => void
+  removeHardReloadListener: () => void
+  onStopLoading: (callback: () => void) => void
+  removeStopLoadingListener: () => void
+  onPrint: (callback: () => void) => void
+  removePrintListener: () => void
+  onFindAgain: (callback: (direction: 1 | -1) => void) => void
+  removeFindAgainListener: () => void
+  onPageDevTools: (callback: () => void) => void
+  removePageDevToolsListener: () => void
 }
 
 declare global {

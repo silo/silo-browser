@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
-import type { GroupItem, SiloIcon, TabItem } from '@renderer/types'
+import type { GroupItem, MediaCapture, SiloIcon, TabItem } from '@renderer/types'
 import { useTopbarTabsStore } from './topbar-tabs'
 import { useUiStore } from './ui'
+import { useRecentlyClosedStore, type ClosedTabSnapshot } from './recently-closed'
 
 export const useGroupsStore = defineStore('groups', () => {
   const groups = ref<GroupItem[]>([])
@@ -53,6 +54,45 @@ export const useGroupsStore = defineStore('groups', () => {
   const allTabsFlat = computed<TabItem[]>(() =>
     sortedGroups.value.flatMap((g) => [...g.tabs].sort((a, b) => a.order - b.order))
   )
+
+  /**
+   * The silo you're "in": the rail's selected silo (set while it has no active tab),
+   * else the active tab's silo. ⌘T, ⌘1–9 and tab cycling act on it.
+   */
+  const currentGroup = computed<GroupItem | null>(() => {
+    const railId = useUiStore().railSiloId
+    return (railId && findGroup(railId)) || activeGroup.value || sortedGroups.value[0] || null
+  })
+
+  function sortedTabsOf(group: GroupItem): TabItem[] {
+    return [...group.tabs].sort((a, b) => a.order - b.order)
+  }
+
+  /**
+   * ⌘1–8 open the Nth tab of the current silo and ⌘9 its last tab (like Chrome).
+   * Returns the digit for a tab, or null when it has no position shortcut.
+   */
+  /** The position shortcut a tab has while its own silo is the current one. */
+  function positionDigitOf(tab: TabItem): number | null {
+    const group = findGroup(tab.groupId)
+    if (!group) return null
+    const tabs = sortedTabsOf(group)
+    const i = tabs.findIndex((t) => t.id === tab.id)
+    if (i === -1) return null
+    if (i < 8) return i + 1
+    return i === tabs.length - 1 ? 9 : null
+  }
+
+  const positionDigits = computed<Map<string, number>>(() => {
+    const map = new Map<string, number>()
+    const group = currentGroup.value
+    if (!group) return map
+    const tabs = sortedTabsOf(group)
+    tabs.slice(0, 8).forEach((t, i) => map.set(t.id, i + 1))
+    const last = tabs[tabs.length - 1]
+    if (last && !map.has(last.id)) map.set(last.id, 9)
+    return map
+  })
 
   // --- Helpers ---
 
@@ -139,6 +179,17 @@ export const useGroupsStore = defineStore('groups', () => {
       const idx = group.tabs.findIndex((t) => t.id === tabId)
       if (idx !== -1) {
         const topbarStore = useTopbarTabsStore()
+        // Remember it (with its pop-up tabs) so ⌘⇧T can bring it back
+        const tab = group.tabs[idx]
+        const children = topbarStore.childTabs
+          .filter((ct) => ct.parentTabId === tabId)
+          .map((ct) => ({
+            url: ct.currentUrl || ct.url,
+            title: ct.currentTitle,
+            iconUrl: ct.iconUrl
+          }))
+        const position = sortedTabsOf(group).findIndex((t) => t.id === tabId)
+        useRecentlyClosedStore().recordTab(tab, position, children)
         topbarStore.removeAllChildTabs(tabId)
         group.tabs.splice(idx, 1)
         if (activeTabId.value === tabId) {
@@ -148,6 +199,28 @@ export const useGroupsStore = defineStore('groups', () => {
         return
       }
     }
+  }
+
+  /** Puts a removed tab back into its silo at `index` (⌘⇧T). Returns null if the silo is gone. */
+  function restoreTab(snapshot: ClosedTabSnapshot, index: number): TabItem | null {
+    const group = findGroup(snapshot.groupId)
+    if (!group || findTab(snapshot.id)) return null
+    const tab: TabItem = {
+      ...snapshot,
+      order: 0,
+      isLoaded: false,
+      notificationCount: 0,
+      isAudioPlaying: false,
+      isAsleep: false
+    }
+    group.tabs.push(tab)
+    // The reactive copy, so later updates are tracked
+    const restored = group.tabs[group.tabs.length - 1]
+    const others = sortedTabsOf(group).filter((t) => t.id !== restored.id)
+    others.splice(Math.max(0, Math.min(index, others.length)), 0, restored)
+    others.forEach((t, i) => (t.order = i))
+    debouncedSave()
+    return restored
   }
 
   function updateTab(
@@ -163,6 +236,7 @@ export const useGroupsStore = defineStore('groups', () => {
         | 'isMuted'
         | 'sleepAfterMinutes'
         | 'userAgent'
+        | 'shortcut'
       >
     >
   ): void {
@@ -187,8 +261,30 @@ export const useGroupsStore = defineStore('groups', () => {
       tab.lastActiveAt = undefined // active tab never sleeps
       activeTabId.value = tabId
       lastTabBySilo.value[tab.groupId] = tabId
-      useUiStore().closeSettingsPage()
+      const ui = useUiStore()
+      // The current silo follows the active tab again (in every layout, not just the rail)
+      ui.setRailSilo(null)
+      ui.closeSettingsPage()
       debouncedSave()
+    }
+  }
+
+  /**
+   * Opens a silo: selects it in the rail and returns to the tab you last used there
+   * (else its first tab). Used by the rail and by ⌃1–9 / Alt+1–9.
+   */
+  function openSilo(groupId: string): void {
+    const group = findGroup(groupId)
+    if (!group) return
+    const lastId = lastTabBySilo.value[group.id]
+    const target = (lastId && group.tabs.find((t) => t.id === lastId)) || sortedTabsOf(group)[0]
+    if (target && target.id !== activeTabId.value) {
+      activateTab(target.id)
+    } else if (useUiStore().sidebarLayout === 'rail') {
+      // An empty silo: the rail shows it selected until a tab is activated (activateTab clears
+      // it). The one-sidebar layout has no such selection, so it isn't set there — it would
+      // silently retarget ⌘T / ⌘1–9 to a silo you can't see is "current".
+      useUiStore().setRailSilo(group.id)
     }
   }
 
@@ -244,6 +340,7 @@ export const useGroupsStore = defineStore('groups', () => {
       tab.currentTitle = undefined
       tab.notificationCount = 0
       tab.isAudioPlaying = false
+      tab.capture = undefined
     }
 
     debouncedSave()
@@ -271,6 +368,29 @@ export const useGroupsStore = defineStore('groups', () => {
   function setTabAudioPlaying(tabId: string, playing: boolean): void {
     const tab = findTab(tabId)
     if (tab) tab.isAudioPlaying = playing
+  }
+
+  function setTabCapture(tabId: string, capture: MediaCapture | undefined): void {
+    const tab = findTab(tabId)
+    if (tab) tab.capture = capture
+  }
+
+  function setTabLoading(tabId: string, loading: boolean): void {
+    const tab = findTab(tabId)
+    if (tab) tab.isLoading = loading
+  }
+
+  /**
+   * True while the tab or one of its pop-up tabs is on a call (camera / mic / screen) or
+   * playing audible sound. Such tabs never go to sleep — sleeping would end the call.
+   */
+  function isTabBusy(tab: TabItem): boolean {
+    const live = (c?: MediaCapture): boolean => !!c && (c.camera || c.mic || c.screen)
+    if (live(tab.capture)) return true
+    if (tab.isAudioPlaying && !tab.isMuted) return true
+    return useTopbarTabsStore().childTabs.some(
+      (ct) => ct.parentTabId === tab.id && (live(ct.capture) || (ct.isAudioPlaying && !tab.isMuted))
+    )
   }
 
   function setTabZoomLevel(tabId: string, level: number): void {
@@ -310,7 +430,8 @@ export const useGroupsStore = defineStore('groups', () => {
             isMuted: t.isMuted,
             sleepAfterMinutes: t.sleepAfterMinutes,
             zoomLevel: t.zoomLevel ?? 0,
-            userAgent: t.userAgent
+            userAgent: t.userAgent,
+            shortcut: t.shortcut
           }))
         }
       })
@@ -331,6 +452,9 @@ export const useGroupsStore = defineStore('groups', () => {
         tab.isAsleep = false
         tab.isLoaded = false
         tab.isAudioPlaying = false
+        tab.isLoading = false
+        tab.capture = undefined
+        if (typeof tab.shortcut !== 'string' || !tab.shortcut) delete tab.shortcut
         tab.notificationCount = tab.notificationCount ?? 0
         tab.notificationsEnabled = tab.notificationsEnabled ?? true
         tab.isMuted = tab.isMuted ?? false
@@ -374,11 +498,12 @@ export const useGroupsStore = defineStore('groups', () => {
             tab.sleepAfterMinutes > 0 &&
             tab.id !== activeTabId.value &&
             tab.lastActiveAt &&
-            now - tab.lastActiveAt >= tab.sleepAfterMinutes * 60_000
+            now - tab.lastActiveAt >= tab.sleepAfterMinutes * 60_000 &&
+            !isTabBusy(tab)
           ) {
             tab.isLoaded = false
             tab.isAsleep = true
-            useTopbarTabsStore().removeAllChildTabs(tab.id)
+            useTopbarTabsStore().unloadChildTabs(tab.id)
           }
         }
       }
@@ -388,10 +513,10 @@ export const useGroupsStore = defineStore('groups', () => {
   /** Puts a tab to sleep now (unloads its webview) — same as the idle timer would. */
   function sleepTab(tabId: string): void {
     const tab = findTab(tabId)
-    if (!tab || tab.id === activeTabId.value || !tab.isLoaded) return
+    if (!tab || tab.id === activeTabId.value || !tab.isLoaded || isTabBusy(tab)) return
     tab.isLoaded = false
     tab.isAsleep = true
-    useTopbarTabsStore().removeAllChildTabs(tab.id)
+    useTopbarTabsStore().unloadChildTabs(tab.id)
   }
 
   return {
@@ -406,6 +531,10 @@ export const useGroupsStore = defineStore('groups', () => {
     allLoadedTabs,
     totalNotifications,
     allTabsFlat,
+    currentGroup,
+    positionDigits,
+    positionDigitOf,
+    sortedTabsOf,
     findTab,
     findGroup,
     addGroup,
@@ -413,8 +542,10 @@ export const useGroupsStore = defineStore('groups', () => {
     updateGroup,
     addTab,
     removeTab,
+    restoreTab,
     updateTab,
     activateTab,
+    openSilo,
     toggleGroupCollapse,
     moveGroup,
     moveTab,
@@ -422,6 +553,9 @@ export const useGroupsStore = defineStore('groups', () => {
     setTabCurrentTitle,
     incrementNotification,
     setTabAudioPlaying,
+    setTabCapture,
+    setTabLoading,
+    isTabBusy,
     setTabZoomLevel,
     loadFromDisk
   }

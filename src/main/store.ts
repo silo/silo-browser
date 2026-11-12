@@ -17,7 +17,9 @@ export interface PersistedState {
   darkShade: string
   siloTint: string
   grantedPermissions: string[] // "origin::permission" entries
-  defaultSleepAfterMinutes: number
+  defaultSleepAfterMinutes: number // for new tabs; 0 = never
+  /** Set once the v2.1 sleep default (new tabs sleep after 1 hour) has been applied */
+  sleepDefaultMigrated: boolean
   confirmCloseChildTabs: boolean
   defaultUserAgent: string
 }
@@ -73,7 +75,9 @@ const defaultState: PersistedState = {
   darkShade: 'pitch',
   siloTint: 'subtle',
   grantedPermissions: [],
-  defaultSleepAfterMinutes: 0,
+  // New tabs sleep after an hour idle: every awake tab is a whole renderer process (100–500 MB)
+  defaultSleepAfterMinutes: 60,
+  sleepDefaultMigrated: true,
   confirmCloseChildTabs: false,
   defaultUserAgent: ''
 }
@@ -116,8 +120,15 @@ export function normalizeState(parsed: Record<string, unknown>): PersistedState 
     grantedPermissions: Array.isArray(parsed.grantedPermissions)
       ? parsed.grantedPermissions.filter((p: unknown) => typeof p === 'string')
       : [],
+    // v2.1 made "after 1 hour" the default for new tabs. Configs from before stored "never"
+    // (the old default) and can't tell it apart from a deliberate choice, so it's switched once;
+    // choosing Never afterwards sticks. Only affects tabs added later, never existing tabs.
     defaultSleepAfterMinutes:
-      typeof parsed.defaultSleepAfterMinutes === 'number' ? parsed.defaultSleepAfterMinutes : 0,
+      typeof parsed.defaultSleepAfterMinutes === 'number' &&
+      (parsed.sleepDefaultMigrated === true || parsed.defaultSleepAfterMinutes !== 0)
+        ? parsed.defaultSleepAfterMinutes
+        : 60,
+    sleepDefaultMigrated: true,
     confirmCloseChildTabs:
       typeof parsed.confirmCloseChildTabs === 'boolean' ? parsed.confirmCloseChildTabs : false,
     defaultUserAgent: typeof parsed.defaultUserAgent === 'string' ? parsed.defaultUserAgent : ''

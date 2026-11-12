@@ -5,10 +5,12 @@ import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { ACCENTS, DARK_SHADES, LIGHT_SHADES, TINTS, mixHex } from '@renderer/utils/theme'
 import { isMac, shortcut } from '@renderer/utils/platform'
-import type { SidebarLayout, ThemeMode } from '@renderer/types'
+import type { SidebarLayout, TabItem, ThemeMode } from '@renderer/types'
 import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
+import ShortcutRecorder from '@renderer/components/inputs/ShortcutRecorder.vue'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
+import TabIcon from '@renderer/components/common/TabIcon.vue'
 
 // Design board "C · Settings": cards for look & feel, behaviour, silos, backup and shortcuts.
 const groupsStore = useGroupsStore()
@@ -104,20 +106,41 @@ function openWebsite(): void {
 
 // --- Shortcuts ---
 
+// Keep in sync with the app menu (src/main/menu.ts) and RESERVED in utils/accelerator.ts
 const shortcuts = [
   { label: 'New tab', keys: shortcut('T') },
+  { label: 'Reopen closed tab', keys: isMac ? '⇧⌘T' : 'Ctrl+Shift+T' },
   { label: 'New silo', keys: shortcut('N') },
   { label: 'Close pop-up tab', keys: shortcut('W') },
+  { label: 'Tab 1–8 in this silo', keys: shortcut('1–8') },
+  { label: 'Last tab in this silo', keys: shortcut('9') },
+  { label: 'Next / previous tab', keys: isMac ? '⌃Tab ⌃⇧Tab' : 'Ctrl+Tab Ctrl+Shift+Tab' },
+  { label: 'Go to silo 1–9', keys: isMac ? '⌃1–9' : 'Alt+1–9' },
+  { label: 'Back / forward', keys: isMac ? '⌘← ⌘→' : 'Alt+← Alt+→' },
   { label: 'Reload', keys: shortcut('R') },
+  { label: 'Reload, skip cache', keys: isMac ? '⇧⌘R' : 'Ctrl+Shift+R' },
+  { label: 'Stop loading', keys: isMac ? '⌘. or Esc' : 'Esc' },
   { label: 'Address & search', keys: shortcut('L') },
   { label: 'Find in page', keys: shortcut('F') },
+  { label: 'Find next / previous', keys: isMac ? '⌘G ⇧⌘G' : 'Ctrl+G Ctrl+Shift+G' },
+  { label: 'Print', keys: shortcut('P') },
   { label: 'Settings', keys: shortcut(',') },
   { label: 'Toggle sidebar', keys: isMac ? '⌘[ ⌘]' : 'Ctrl+[ ]' },
-  { label: 'Go to tab 1–9', keys: shortcut('1–9') },
   { label: 'Zoom in / out', keys: isMac ? '⌘+ ⌘−' : 'Ctrl+ +/−' },
   { label: 'Actual size', keys: shortcut('0') },
+  { label: 'Developer tools', keys: isMac ? '⌥⌘I' : 'Ctrl+Shift+I' },
   { label: 'Close dialog or settings', keys: 'Esc' }
 ]
+
+/** A tab's default shortcut: its position while its silo is the current one. */
+function positionLabel(tab: TabItem): string {
+  const digit = groupsStore.positionDigitOf(tab)
+  return digit ? shortcut(String(digit)) : 'None'
+}
+
+function setTabShortcut(tabId: string, accelerator: string): void {
+  groupsStore.updateTab(tabId, { shortcut: accelerator || undefined })
+}
 </script>
 
 <template>
@@ -375,7 +398,9 @@ const shortcuts = [
             <div class="flex items-center gap-3.5 border-b border-row-line py-2.5">
               <div class="flex flex-1 flex-col gap-0.5">
                 <label for="c-sleep" class="text-[13px] font-semibold">Put idle tabs to sleep</label>
-                <span class="text-[12px] text-fg2">For new tabs — each tab can change it</span>
+                <span class="text-[12px] text-fg2"
+                  >For new tabs. Asleep tabs don't notify — set mail and chat tabs to Never</span
+                >
               </div>
               <select
                 id="c-sleep"
@@ -519,6 +544,53 @@ const shortcuts = [
                   {{ k.keys }}
                 </kbd>
               </div>
+            </div>
+
+            <!-- Per-tab shortcuts: position by default, custom if set -->
+            <div v-if="groupsStore.groups.some((g) => g.tabs.length)" class="mt-5 flex flex-col">
+              <h3 class="m-0 text-[14px] font-bold">Tab shortcuts</h3>
+              <p class="m-0 mt-0.5 mb-1 text-[12px] text-fg3">
+                In the silo you're in, {{ shortcut('1') }}–{{ shortcut('8') }} open its tabs in
+                order and {{ shortcut('9') }} the last one. Give a tab its own shortcut to open it
+                from any silo.
+              </p>
+              <template v-for="g in groupsStore.sortedGroups" :key="g.id">
+                <div v-if="g.tabs.length" class="flex flex-col">
+                  <span
+                    class="flex items-center gap-2 pt-3 pb-1 text-[11px] font-semibold tracking-[0.04em] text-fg3 uppercase"
+                  >
+                    <SiloTile :silo="g" :size="14" :radius="4" />
+                    {{ g.name }}
+                  </span>
+                  <div
+                    class="grid gap-x-5 [grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))]"
+                  >
+                    <div
+                      v-for="t in groupsStore.sortedTabsOf(g)"
+                      :key="t.id"
+                      class="flex min-h-[44px] items-center gap-2.5 border-b border-row-line py-1.5"
+                    >
+                      <TabIcon
+                        :name="t.name"
+                        :url="t.url"
+                        :icon-url="t.iconUrl"
+                        :icon-emoji="t.iconEmoji"
+                        :size="16"
+                      />
+                      <span class="min-w-0 flex-1 truncate text-[12.5px] text-fg2">{{
+                        t.name
+                      }}</span>
+                      <ShortcutRecorder
+                        :model-value="t.shortcut ?? ''"
+                        :tab-id="t.id"
+                        :placeholder="positionLabel(t)"
+                        :label="`Shortcut for ${t.name}`"
+                        @update:model-value="setTabShortcut(t.id, $event)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </section>
         </div>

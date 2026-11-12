@@ -8,6 +8,15 @@ interface DisplayMediaPickRequest {
   sources: { id: string; name: string; thumbnail: string; isScreen: boolean }[]
 }
 
+/** Subscribes to a main → renderer channel (menu accelerators etc.). */
+function listen<T extends unknown[]>(channel: string, callback: (...args: T) => void): void {
+  ipcRenderer.on(channel, (_event, ...args) => callback(...(args as T)))
+}
+
+function unlisten(channel: string): void {
+  ipcRenderer.removeAllListeners(channel)
+}
+
 const api = {
   platform: process.platform as string,
   webviewPreloadPath: `file://${join(__dirname, 'webview.js')}`,
@@ -46,9 +55,10 @@ const api = {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
   exportConfig: (): Promise<string | null> => ipcRenderer.invoke('dialog:export-config'),
   importConfig: (): Promise<unknown | null> => ipcRenderer.invoke('dialog:import-config'),
-  onOpenInNewTab: (callback: (url: string) => void): void => {
-    ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string) => {
-      callback(url)
+  // sourceId: webContents id of the page that opened it (to attach the pop-up to that tab)
+  onOpenInNewTab: (callback: (url: string, sourceId?: number) => void): void => {
+    ipcRenderer.on('webview-context:open-in-new-tab', (_event, url: string, sourceId?: number) => {
+      callback(url, sourceId)
     })
   },
   removeOpenInNewTabListener: (): void => {
@@ -178,7 +188,33 @@ const api = {
   },
   respondToDisplayMediaPick: (requestId: number, sourceId: string | null): void => {
     ipcRenderer.send('display-media:response', { requestId, sourceId })
-  }
+  },
+  // Custom per-tab shortcuts → hidden app-menu items, so they fire while a page has focus
+  setTabShortcuts: (shortcuts: { tabId: string; accelerator: string }[]): Promise<void> =>
+    ipcRenderer.invoke('menu:set-tab-shortcuts', shortcuts),
+  onActivateTab: (callback: (tabId: string) => void): void =>
+    listen('shortcut:activate-tab', callback),
+  removeActivateTabListener: (): void => unlisten('shortcut:activate-tab'),
+  onReopenClosedTab: (callback: () => void): void => listen('shortcut:reopen-closed-tab', callback),
+  removeReopenClosedTabListener: (): void => unlisten('shortcut:reopen-closed-tab'),
+  onGoToSilo: (callback: (index: number) => void): void => listen('shortcut:go-to-silo', callback),
+  removeGoToSiloListener: (): void => unlisten('shortcut:go-to-silo'),
+  onCycleTab: (callback: (step: number) => void): void => listen('shortcut:cycle-tab', callback),
+  removeCycleTabListener: (): void => unlisten('shortcut:cycle-tab'),
+  onNavigate: (callback: (direction: 'back' | 'forward') => void): void =>
+    listen('shortcut:navigate', callback),
+  removeNavigateListener: (): void => unlisten('shortcut:navigate'),
+  onHardReload: (callback: () => void): void => listen('shortcut:hard-reload', callback),
+  removeHardReloadListener: (): void => unlisten('shortcut:hard-reload'),
+  onStopLoading: (callback: () => void): void => listen('shortcut:stop-loading', callback),
+  removeStopLoadingListener: (): void => unlisten('shortcut:stop-loading'),
+  onPrint: (callback: () => void): void => listen('shortcut:print', callback),
+  removePrintListener: (): void => unlisten('shortcut:print'),
+  onFindAgain: (callback: (direction: 1 | -1) => void): void =>
+    listen('shortcut:find-again', callback),
+  removeFindAgainListener: (): void => unlisten('shortcut:find-again'),
+  onPageDevTools: (callback: () => void): void => listen('shortcut:page-devtools', callback),
+  removePageDevToolsListener: (): void => unlisten('shortcut:page-devtools')
 }
 
 if (process.contextIsolated) {

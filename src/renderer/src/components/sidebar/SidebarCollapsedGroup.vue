@@ -3,7 +3,14 @@ import { computed, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useGroupDnd } from '@renderer/composables/useSidebarDnd'
-import { formatBadge, siloUnread, useSiloMenus } from '@renderer/composables/useSiloMenus'
+import {
+  captureLabel,
+  formatBadge,
+  isCapturing,
+  siloCapture,
+  siloUnread,
+  useSiloMenus
+} from '@renderer/composables/useSiloMenus'
 import type { GroupItem } from '@renderer/types'
 import SidebarCollapsedTab from './SidebarCollapsedTab.vue'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
@@ -19,6 +26,8 @@ const { openSiloMenu } = useSiloMenus()
 const headerEl = ref<HTMLElement | null>(null)
 const dnd = useGroupDnd(() => props.group, headerEl)
 const unread = computed(() => siloUnread(props.group))
+const capture = computed(() => siloCapture(props.group))
+const live = computed(() => (isCapturing(capture.value) ? captureLabel(capture.value) : ''))
 const sortedTabs = computed(() => [...props.group.tabs].sort((a, b) => a.order - b.order))
 
 function showTooltip(e: MouseEvent): void {
@@ -26,6 +35,7 @@ function showTooltip(e: MouseEvent): void {
   const n = props.group.tabs.length
   const sub = [
     `${n} ${n === 1 ? 'tab' : 'tabs'}`,
+    live.value,
     unread.value ? `${unread.value} unread` : '',
     props.group.isCollapsed ? 'click to show tabs' : 'click to hide tabs'
   ]
@@ -53,7 +63,7 @@ function showTooltip(e: MouseEvent): void {
       draggable="true"
       class="relative mb-1 flex h-7 w-10 items-center justify-center rounded-lg transition-colors"
       :class="dnd.isDropHighlighted.value ? 'bg-accent-soft' : 'hover:bg-hover'"
-      :aria-label="group.name + (unread ? `, ${unread} unread` : '')"
+      :aria-label="group.name + (live ? `, ${live}` : '') + (unread ? `, ${unread} unread` : '')"
       :aria-expanded="!group.isCollapsed"
       @click="groupsStore.toggleGroupCollapse(group.id)"
       @contextmenu="openSiloMenu($event, group)"
@@ -77,6 +87,17 @@ function showTooltip(e: MouseEvent): void {
         class="absolute -top-1 right-0 flex h-4 min-w-4 items-center justify-center rounded-lg border-2 border-chrome bg-badge px-1 text-[9.5px] font-semibold text-white"
       >
         {{ formatBadge(unread) }}
+      </span>
+      <span
+        v-if="group.isCollapsed && live"
+        aria-hidden="true"
+        class="absolute right-0.5 -bottom-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-chrome bg-badge text-white"
+      >
+        <AppIcon
+          :name="capture.camera ? 'camera' : capture.mic ? 'mic' : 'screen-share'"
+          :size="8"
+          :stroke="3"
+        />
       </span>
     </button>
     <template v-if="!group.isCollapsed">

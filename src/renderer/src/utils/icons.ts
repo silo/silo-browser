@@ -34,7 +34,15 @@ export const ICONS = {
   minus: 'M5 12h14',
   arrow: 'M5 12h14m-6-6 6 6-6 6',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
-  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-6v-4m0-4h.01'
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-6v-4m0-4h.01',
+  // Live capture indicators (camera / microphone / screen share)
+  camera: 'M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm12 4 6-4v12l-6-4',
+  mic: 'M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3zm7 8v2a7 7 0 0 1-14 0v-2m7 9v3',
+  'screen-share':
+    'M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 21h8m-4-4v4M9 10l3-3 3 3m-3-3v6',
+  keyboard:
+    'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm3 4h.01M11 9h.01M15 9h.01M7 13h.01M17 13h.01M8 16h8',
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 2'
 } as const
 
 export type AppIconName = keyof typeof ICONS

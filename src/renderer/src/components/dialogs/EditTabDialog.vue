@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { shortcut } from '@renderer/utils/platform'
 import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
+import ShortcutRecorder from '@renderer/components/inputs/ShortcutRecorder.vue'
 import DialogShell from '@renderer/components/common/DialogShell.vue'
 import TabIcon from '@renderer/components/common/TabIcon.vue'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
@@ -17,6 +19,14 @@ const notificationsEnabled = ref(true)
 const sleepAfterMinutes = ref(0)
 const userAgent = ref('')
 const isMuted = ref(false)
+const tabShortcut = ref('')
+
+// Without a custom shortcut the tab keeps its position one (⌘1–8, ⌘9 = last) in its silo
+const positionHint = computed(() => {
+  const tab = uiStore.editTabTargetId ? groupsStore.findTab(uiStore.editTabTargetId) : null
+  const digit = tab ? groupsStore.positionDigitOf(tab) : null
+  return digit ? `${shortcut(String(digit))} · by position` : 'None'
+})
 
 watch(
   () => uiStore.editTabTargetId,
@@ -31,6 +41,7 @@ watch(
       sleepAfterMinutes.value = tab.sleepAfterMinutes ?? 0
       userAgent.value = tab.userAgent ?? ''
       isMuted.value = tab.isMuted
+      tabShortcut.value = tab.shortcut ?? ''
     }
   },
   { immediate: true }
@@ -53,7 +64,8 @@ function submit(): void {
     notificationsEnabled: notificationsEnabled.value,
     sleepAfterMinutes: sleepAfterMinutes.value,
     isMuted: isMuted.value,
-    userAgent: userAgent.value.trim() || undefined
+    userAgent: userAgent.value.trim() || undefined,
+    shortcut: tabShortcut.value || undefined
   })
   close()
 }
@@ -126,7 +138,10 @@ function close(): void {
         />
       </div>
       <div class="flex items-center gap-3.5 border-b border-row-line py-2.5">
-        <label for="edit-tab-sleep" class="flex-1 text-[13px] font-semibold">Put to sleep when idle</label>
+        <span class="flex flex-1 flex-col gap-0.5">
+          <label for="edit-tab-sleep" class="text-[13px] font-semibold">Put to sleep when idle</label>
+          <span class="text-[12px] text-fg3">Asleep tabs don't get notifications</span>
+        </span>
         <select id="edit-tab-sleep" v-model.number="sleepAfterMinutes" class="select-field">
           <option :value="0">Never</option>
           <option :value="30">After 30 min</option>
@@ -134,6 +149,19 @@ function close(): void {
           <option :value="120">After 2 hours</option>
           <option :value="240">After 4 hours</option>
         </select>
+      </div>
+      <div class="flex items-start gap-3.5 border-b border-row-line py-2.5">
+        <span class="flex flex-1 flex-col gap-0.5 pt-1">
+          <span class="text-[13px] font-semibold">Keyboard shortcut</span>
+          <span class="text-[12px] text-fg3">Opens this tab from any silo</span>
+        </span>
+        <ShortcutRecorder
+          v-if="uiStore.editTabTargetId"
+          v-model="tabShortcut"
+          :tab-id="uiStore.editTabTargetId"
+          :placeholder="positionHint"
+          label="Keyboard shortcut"
+        />
       </div>
       <div class="flex items-start gap-3.5 pt-2.5">
         <span class="flex flex-1 flex-col gap-0.5 pt-1">

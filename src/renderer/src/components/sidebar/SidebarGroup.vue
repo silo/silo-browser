@@ -3,11 +3,19 @@ import { computed, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useGroupDnd } from '@renderer/composables/useSidebarDnd'
-import { formatBadge, siloUnread, useSiloMenus } from '@renderer/composables/useSiloMenus'
+import {
+  captureLabel,
+  formatBadge,
+  isCapturing,
+  siloCapture,
+  siloUnread,
+  useSiloMenus
+} from '@renderer/composables/useSiloMenus'
 import type { GroupItem } from '@renderer/types'
 import SidebarTab from './SidebarTab.vue'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
+import CaptureIcons from '@renderer/components/common/CaptureIcons.vue'
 
 const props = defineProps<{ group: GroupItem }>()
 
@@ -21,6 +29,8 @@ const dnd = useGroupDnd(() => props.group, headerEl)
 const isActiveSilo = computed(() => groupsStore.activeGroup?.id === props.group.id)
 const open = computed(() => !props.group.isCollapsed)
 const unread = computed(() => siloUnread(props.group))
+const capture = computed(() => siloCapture(props.group))
+const live = computed(() => (isCapturing(capture.value) ? captureLabel(capture.value) : ''))
 const sortedTabs = computed(() => [...props.group.tabs].sort((a, b) => a.order - b.order))
 </script>
 
@@ -53,7 +63,11 @@ const sortedTabs = computed(() => [...props.group.tabs].sort((a, b) => a.order -
         type="button"
         class="flex h-[30px] min-w-0 flex-1 items-center gap-[9px] text-left"
         :aria-expanded="open"
-        :aria-label="group.name + (unread && !open ? `, ${unread} unread` : '')"
+        :aria-label="
+          group.name +
+          (live && !open ? `, ${live}` : '') +
+          (unread && !open ? `, ${unread} unread` : '')
+        "
         @click="groupsStore.toggleGroupCollapse(group.id)"
       >
         <SiloTile :silo="group" :size="20" :radius="6" :ring="isActiveSilo" />
@@ -67,9 +81,12 @@ const sortedTabs = computed(() => [...props.group.tabs].sort((a, b) => a.order -
           class="text-fg3 transition-transform duration-150"
           :class="open ? '' : '-rotate-90'"
         />
+        <!-- Collapsed silo: show that one of its tabs is on a call -->
+        <CaptureIcons v-if="!open && live" :capture="capture" :size="13" class="ml-auto" />
         <span
           v-if="!open && unread"
-          class="ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-badge px-[5px] text-[11px] font-semibold text-white"
+          :class="live ? 'ml-1.5' : 'ml-auto'"
+          class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] bg-badge px-[5px] text-[11px] font-semibold text-white"
         >
           {{ formatBadge(unread) }}
         </span>

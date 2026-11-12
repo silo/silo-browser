@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed, toRaw } from 'vue'
+import { ref, computed, toRaw, watch } from 'vue'
 import { useGroupsStore } from './groups'
-import type { ChildTab } from '@renderer/types'
+import { useRecentlyClosedStore } from './recently-closed'
+import type { ChildTab, MediaCapture } from '@renderer/types'
 
 export const useTopbarTabsStore = defineStore('topbarTabs', () => {
   const childTabs = ref<ChildTab[]>([])
@@ -26,6 +27,16 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
   })
 
   const isChildActive = computed(() => activeTopbarTabId.value !== null)
+
+  // Each pop-up is a full renderer process (~100–400 MB). Ones restored from the last session
+  // only get a webview once they're shown, like sidebar tabs; after that they stay loaded.
+  const loadedChildTabs = computed(() =>
+    childTabs.value.filter((ct) => ct.isLoaded || ct.id === activeTopbarTabId.value)
+  )
+  watch(activeTopbarTabId, (id) => {
+    const child = id ? childTabs.value.find((ct) => ct.id === id) : undefined
+    if (child && !child.isLoaded) child.isLoaded = true
+  })
 
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -68,7 +79,10 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
         currentUrl: ct.url,
         currentTitle: undefined,
         iconUrl: undefined,
-        isAudioPlaying: false
+        isAudioPlaying: false,
+        isLoading: false,
+        capture: undefined,
+        isLoaded: false
       }))
 
     const restoredActiveId = (state.activeChildTabId as string | null) ?? null
@@ -79,16 +93,29 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     }
   }
 
-  function addChildTab(parentTabId: string, groupId: string, url: string): ChildTab {
+  /**
+   * Opens a pop-up tab under a sidebar tab. `openerId` is the pop-up it was opened from (null =
+   * the sidebar tab's own page); closing it returns there. `activate: false` adds it without
+   * switching to it (e.g. opened by a tab in the background). `load: false` creates it unloaded
+   * (its webview is made when it's first shown).
+   */
+  function addChildTab(
+    parentTabId: string,
+    groupId: string,
+    url: string,
+    options: { openerId?: string | null; activate?: boolean; load?: boolean } = {}
+  ): ChildTab {
     const child: ChildTab = {
       id: crypto.randomUUID(),
       parentTabId,
       groupId,
       url,
-      currentUrl: url
+      currentUrl: url,
+      openerId: options.openerId ?? null,
+      isLoaded: options.load !== false
     }
     childTabs.value.push(child)
-    activeChildTabId.value = child.id
+    if (options.activate !== false) activeChildTabId.value = child.id
     debouncedSave()
     return child
   }
@@ -97,11 +124,25 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     const idx = childTabs.value.findIndex((ct) => ct.id === childId)
     if (idx === -1) return
     const removed = childTabs.value[idx]
+    // Remember it so ⌘⇧T can reopen it
+    useRecentlyClosedStore().recordChild(removed.parentTabId, removed.groupId, {
+      url: removed.currentUrl || removed.url,
+      title: removed.currentTitle,
+      iconUrl: removed.iconUrl
+    })
     childTabs.value.splice(idx, 1)
 
+    // Pop-ups opened from the closed one now count as opened from its opener
+    for (const ct of childTabs.value) {
+      if (ct.openerId === childId) ct.openerId = removed.openerId ?? null
+    }
     if (activeChildTabId.value === childId) {
-      const siblings = childTabs.value.filter((ct) => ct.parentTabId === removed.parentTabId)
-      activeChildTabId.value = siblings.length > 0 ? siblings[siblings.length - 1].id : null
+      // Back to where it was opened from (like Chrome): its opener pop-up, else the sidebar
+      // tab's own page — not whichever other pop-up happens to be last
+      const opener = removed.openerId
+        ? childTabs.value.find((ct) => ct.id === removed.openerId)
+        : undefined
+      activeChildTabId.value = opener ? opener.id : null
     }
     debouncedSave()
   }
@@ -113,6 +154,20 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
       if (!stillExists) activeChildTabId.value = null
     }
     debouncedSave()
+  }
+
+  /**
+   * The sidebar tab went to sleep: its pop-ups stay (as pills, with their titles) but drop their
+   * webviews, and load again when shown — they used to be deleted.
+   */
+  function unloadChildTabs(parentTabId: string): void {
+    for (const ct of childTabs.value) {
+      if (ct.parentTabId !== parentTabId) continue
+      ct.isLoaded = false
+      ct.isAudioPlaying = false
+      ct.isLoading = false
+      ct.capture = undefined
+    }
   }
 
   function activateMainTab(): void {
@@ -145,6 +200,16 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     if (child) child.isAudioPlaying = playing
   }
 
+  function setChildCapture(childId: string, capture: MediaCapture | undefined): void {
+    const child = childTabs.value.find((ct) => ct.id === childId)
+    if (child) child.capture = capture
+  }
+
+  function setChildLoading(childId: string, loading: boolean): void {
+    const child = childTabs.value.find((ct) => ct.id === childId)
+    if (child) child.isLoading = loading
+  }
+
   function findChild(childId: string): ChildTab | undefined {
     return childTabs.value.find((ct) => ct.id === childId)
   }
@@ -155,16 +220,20 @@ export const useTopbarTabsStore = defineStore('topbarTabs', () => {
     currentChildTabs,
     activeTopbarTabId,
     isChildActive,
+    loadedChildTabs,
     loadFromDisk,
     addChildTab,
     removeChildTab,
     removeAllChildTabs,
+    unloadChildTabs,
     activateMainTab,
     activateChildTab,
     setChildCurrentUrl,
     setChildCurrentTitle,
     setChildIconUrl,
     setChildAudioPlaying,
+    setChildCapture,
+    setChildLoading,
     findChild
   }
 })

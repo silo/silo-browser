@@ -2,9 +2,17 @@
 import { computed, ref } from 'vue'
 import { useUiStore } from '@renderer/stores/ui'
 import { useGroupDnd } from '@renderer/composables/useSidebarDnd'
-import { formatBadge, siloUnread, useSiloMenus } from '@renderer/composables/useSiloMenus'
+import {
+  captureLabel,
+  formatBadge,
+  isCapturing,
+  siloCapture,
+  siloUnread,
+  useSiloMenus
+} from '@renderer/composables/useSiloMenus'
 import type { GroupItem } from '@renderer/types'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
+import AppIcon from '@renderer/components/common/AppIcon.vue'
 
 // One silo button on the rail (design board "C · Main — rail + list").
 const props = defineProps<{ group: GroupItem; selected: boolean }>()
@@ -16,11 +24,18 @@ const { openSiloMenu } = useSiloMenus()
 const el = ref<HTMLElement | null>(null)
 const dnd = useGroupDnd(() => props.group, el)
 const unread = computed(() => siloUnread(props.group))
+// A call in any tab (or pop-up tab) of this silo — visible even when another silo is selected
+const capture = computed(() => siloCapture(props.group))
+const live = computed(() => (isCapturing(capture.value) ? captureLabel(capture.value) : ''))
 
 function showTooltip(e: MouseEvent): void {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const n = props.group.tabs.length
-  const sub = [`${n} ${n === 1 ? 'tab' : 'tabs'}`, unread.value ? `${unread.value} unread` : '']
+  const sub = [
+    `${n} ${n === 1 ? 'tab' : 'tabs'}`,
+    live.value,
+    unread.value ? `${unread.value} unread` : ''
+  ]
     .filter(Boolean)
     .join(' · ')
   uiStore.showSidebarTooltip(props.group.name, rect.right + 10, rect.top + rect.height / 2, sub)
@@ -47,7 +62,9 @@ function showTooltip(e: MouseEvent): void {
       draggable="true"
       class="relative rounded-[18px] transition-transform active:scale-95"
       :class="dnd.isDropHighlighted.value ? 'scale-110' : ''"
-      :aria-label="`${group.name} silo` + (unread ? `, ${unread} unread` : '')"
+      :aria-label="
+        `${group.name} silo` + (live ? `, ${live}` : '') + (unread ? `, ${unread} unread` : '')
+      "
       :aria-pressed="selected"
       @click="emit('select')"
       @contextmenu="openSiloMenu($event, group)"
@@ -73,6 +90,17 @@ function showTooltip(e: MouseEvent): void {
         class="absolute -top-[5px] -right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-[9px] border-2 border-rail bg-badge px-1 text-[10px] font-semibold text-white"
       >
         {{ formatBadge(unread) }}
+      </span>
+      <span
+        v-if="live"
+        aria-hidden="true"
+        class="absolute -right-1 -bottom-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 border-rail bg-badge text-white"
+      >
+        <AppIcon
+          :name="capture.camera ? 'camera' : capture.mic ? 'mic' : 'screen-share'"
+          :size="9"
+          :stroke="2.6"
+        />
       </span>
     </button>
     <div

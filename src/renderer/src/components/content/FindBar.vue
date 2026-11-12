@@ -11,7 +11,8 @@ const topbarStore = useTopbarTabsStore()
 const uiStore = useUiStore()
 const webviewRegistry = useWebviewRegistry()
 
-const searchText = ref('')
+// Reopens with the previous search, like Chrome
+const searchText = ref(uiStore.lastFindText)
 const activeMatchOrdinal = ref(0)
 const totalMatches = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -22,16 +23,26 @@ onMounted(() => {
     inputRef.value?.select()
   })
   attachWebviewListener()
+  // Opened by ⌘G / ⌘⇧G: search in that direction; opened by ⌘F: start from the top
+  const cmd = takeFindCommand()
+  if (searchText.value) find(cmd?.dir ?? 1)
 })
 
 function getWebview(): Electron.WebviewTag | null {
   return webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
 }
 
-function find(): void {
+function find(dir: 1 | -1 = 1): void {
   const wv = getWebview()
   if (!wv || !searchText.value) return
-  wv.findInPage(searchText.value)
+  wv.findInPage(searchText.value, { forward: dir > 0 })
+}
+
+/** The pending ⌘G / ⌘⇧G from the menu, if any (each is handled once). */
+function takeFindCommand(): { dir: 1 | -1 } | null {
+  const cmd = uiStore.findCommand
+  if (cmd) uiStore.findCommand = null
+  return cmd
 }
 
 function findNext(): void {
@@ -55,8 +66,20 @@ function close(): void {
   uiStore.closeFindBar()
 }
 
+// ⌘G / ⌘⇧G from the menu while the bar is open (when it was closed, onMounted handles it)
+watch(
+  () => uiStore.findCommand,
+  () => {
+    const cmd = takeFindCommand()
+    if (!cmd || !searchText.value) return
+    if (cmd.dir > 0) findNext()
+    else findPrevious()
+  }
+)
+
 watch(searchText, (val) => {
   if (val) {
+    uiStore.lastFindText = val
     find()
   } else {
     const wv = getWebview()

@@ -104,6 +104,16 @@ export const useUiStore = defineStore('ui', () => {
     confirmRemoveTabIsChild.value = false
   }
 
+  // --- Confirm delete silo dialog (deleting wipes the silo's logins) ---
+  const confirmDeleteSiloId = ref<string | null>(null)
+  function openConfirmDeleteSilo(groupId: string): void {
+    hideContextMenu()
+    confirmDeleteSiloId.value = groupId
+  }
+  function closeConfirmDeleteSilo(): void {
+    confirmDeleteSiloId.value = null
+  }
+
   // --- Context menu ---
   function showContextMenu(x: number, y: number, items: ContextMenuEntry[]): void {
     contextMenuX.value = x
@@ -135,7 +145,7 @@ export const useUiStore = defineStore('ui', () => {
 
   // --- App settings ---
   const openLinksInNewTab = ref(true)
-  const defaultSleepAfterMinutes = ref(0)
+  const defaultSleepAfterMinutes = ref(60)
   const confirmCloseChildTabs = ref(false)
   const defaultUserAgent = ref('')
 
@@ -270,11 +280,30 @@ export const useUiStore = defineStore('ui', () => {
 
   // --- Find bar ---
   const findBarOpen = ref(false)
+  // Last search, restored when the bar reopens (like Chrome)
+  const lastFindText = ref('')
+  // ⌘G / ⌘⇧G from the menu; FindBar watches `seq`
+  const findCommand = ref<{ dir: 1 | -1; seq: number } | null>(null)
+  let findSeq = 0
   function openFindBar(): void {
     findBarOpen.value = true
   }
   function closeFindBar(): void {
     findBarOpen.value = false
+  }
+  function findAgain(dir: 1 | -1): void {
+    findBarOpen.value = true
+    findCommand.value = { dir, seq: ++findSeq }
+  }
+
+  // --- Shortcut hints: shown on every tab while ⌘ (Ctrl) is held for a moment ---
+  const modifierHeld = ref(false)
+  let modifierTimer: ReturnType<typeof setTimeout> | null = null
+  function setModifierDown(down: boolean): void {
+    if (modifierTimer) clearTimeout(modifierTimer)
+    modifierTimer = null
+    if (down) modifierTimer = setTimeout(() => (modifierHeld.value = true), 400)
+    else modifierHeld.value = false
   }
 
   // --- Command bar (⌘L) ---
@@ -324,7 +353,7 @@ export const useUiStore = defineStore('ui', () => {
     const state = (preloaded ?? (await window.api.getState())) as Record<string, unknown>
     sidebarExpanded.value = (state.sidebarExpanded as boolean | undefined) ?? true
     openLinksInNewTab.value = (state.openLinksInNewTab as boolean | undefined) ?? true
-    defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 0
+    defaultSleepAfterMinutes.value = (state.defaultSleepAfterMinutes as number | undefined) ?? 60
     confirmCloseChildTabs.value = (state.confirmCloseChildTabs as boolean | undefined) ?? false
     defaultUserAgent.value = (state.defaultUserAgent as string | undefined) ?? ''
     sidebarLayout.value = (state.sidebarLayout as SidebarLayout | undefined) ?? 'sidebar'
@@ -356,6 +385,9 @@ export const useUiStore = defineStore('ui', () => {
     confirmRemoveTabIsChild,
     openConfirmRemoveTabDialog,
     closeConfirmRemoveTabDialog,
+    confirmDeleteSiloId,
+    openConfirmDeleteSilo,
+    closeConfirmDeleteSilo,
     contextMenuVisible,
     contextMenuX,
     contextMenuY,
@@ -393,8 +425,13 @@ export const useUiStore = defineStore('ui', () => {
     showDisplayMediaPick,
     respondToDisplayMediaPick,
     findBarOpen,
+    lastFindText,
+    findCommand,
     openFindBar,
     closeFindBar,
+    findAgain,
+    modifierHeld,
+    setModifierDown,
     commandBarOpen,
     openCommandBar,
     closeCommandBar,

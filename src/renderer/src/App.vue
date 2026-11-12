@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useRecentlyClosedStore } from '@renderer/stores/recently-closed'
 import { useWebviewRegistry, type WebviewTag } from '@renderer/composables/useWebviewRegistry'
 import { useAppTheme } from '@renderer/composables/useAppTheme'
+import { navigateWebview } from '@renderer/composables/usePageMessages'
+import { isMac } from '@renderer/utils/platform'
+import type { TabItem } from '@renderer/types'
 import TheSidebar from '@renderer/components/sidebar/TheSidebar.vue'
 import TheNavigationBar from '@renderer/components/content/TheNavigationBar.vue'
 import TheContentArea from '@renderer/components/content/TheContentArea.vue'
@@ -23,6 +27,9 @@ const SettingsPage = defineAsyncComponent(
 const ConfirmRemoveTabDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/ConfirmRemoveTabDialog.vue')
 )
+const ConfirmDeleteSiloDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/ConfirmDeleteSiloDialog.vue')
+)
 const UpdateDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/UpdateDialog.vue')
 )
@@ -34,9 +41,24 @@ const CommandBar = defineAsyncComponent(() => import('@renderer/components/Comma
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
+const recentlyClosed = useRecentlyClosedStore()
 const webviewRegistry = useWebviewRegistry()
 
 useAppTheme()
+
+// Custom tab shortcuts are registered as app-menu accelerators by the main process, so they
+// fire even while a page has focus. Re-sent only when the list actually changes.
+const tabShortcuts = computed(() =>
+  groupsStore.allTabsFlat
+    .filter((t) => t.shortcut)
+    .map((t) => ({ tabId: t.id, accelerator: t.shortcut as string }))
+)
+watch(
+  () => JSON.stringify(tabShortcuts.value),
+  () => {
+    if (groupsStore.loaded) window.api.setTabShortcuts(tabShortcuts.value)
+  }
+)
 
 /**
  * The window is one CSS grid so the content area (and its webviews) never changes DOM parent
@@ -66,13 +88,13 @@ onMounted(async () => {
   const state = await window.api.getState()
   await Promise.all([groupsStore.loadFromDisk(state), uiStore.loadFromDisk(state)])
   await topbarStore.loadFromDisk(state)
+  window.api.setTabShortcuts(tabShortcuts.value)
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('keyup', handleKeyup)
+  window.addEventListener('blur', handleBlur)
 
-  // "Open in New Tab" from the webview context menu
-  window.api.onOpenInNewTab((url: string) => {
-    const activeTab = groupsStore.activeTab
-    if (activeTab) topbarStore.addChildTab(activeTab.id, activeTab.groupId, url)
-  })
+  // Pop-up tabs: window.open / target=_blank links and "Open Link in New Tab"
+  window.api.onOpenInNewTab((url: string, sourceId?: number) => openPopup(url, sourceId))
 
   window.api.onUpdateDownloaded((version: string) => uiStore.showUpdateDialog(version))
   window.api.onUpdaterFallbackAvailable((version: string) =>
@@ -95,6 +117,16 @@ onMounted(async () => {
   window.api.onZoomIn(() => applyZoom(0.5))
   window.api.onZoomOut(() => applyZoom(-0.5))
   window.api.onZoomReset(() => applyZoom(0, true))
+  window.api.onReopenClosedTab(() => recentlyClosed.reopenLast())
+  window.api.onActivateTab((tabId: string) => activateFromShortcut(tabId))
+  window.api.onGoToSilo((index: number) => goToSilo(index))
+  window.api.onCycleTab((step: number) => cycleTab(step))
+  window.api.onNavigate((direction) => navigate(direction))
+  window.api.onHardReload(() => getActiveWebview()?.reloadIgnoringCache())
+  window.api.onStopLoading(() => getActiveWebview()?.stop())
+  window.api.onPrint(() => getActiveWebview()?.print())
+  window.api.onFindAgain((direction) => uiStore.findAgain(direction))
+  window.api.onPageDevTools(() => togglePageDevTools())
 })
 
 onUnmounted(() => {
@@ -116,11 +148,63 @@ onUnmounted(() => {
   window.api.removePermissionRequestListener()
   window.api.removeDisplayMediaPickListener()
   window.api.removeFindListener()
+  window.api.removeReopenClosedTabListener()
+  window.api.removeActivateTabListener()
+  window.api.removeGoToSiloListener()
+  window.api.removeCycleTabListener()
+  window.api.removeNavigateListener()
+  window.api.removeHardReloadListener()
+  window.api.removeStopLoadingListener()
+  window.api.removePrintListener()
+  window.api.removeFindAgainListener()
+  window.api.removePageDevToolsListener()
+  window.removeEventListener('keyup', handleKeyup)
+  window.removeEventListener('blur', handleBlur)
 })
 
 function getActiveWebview(): WebviewTag | null {
   return webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
 }
+
+/**
+ * Opens a pop-up tab under the sidebar tab whose page opened it (`sourceId` = that page's
+ * webContents id), remembering the opener so closing it returns there. A pop-up opened by a
+ * tab in the background stays with that tab instead of taking over the one you're looking at.
+ */
+function openPopup(url: string, sourceId?: number): void {
+  const source = typeof sourceId === 'number' ? webviewRegistry.findByWebContentsId(sourceId) : null
+  let parent: TabItem | null = null
+  let openerId: string | null = null
+  if (source?.kind === 'main') {
+    parent = groupsStore.findTab(source.tabId)
+  } else if (source?.kind === 'child') {
+    const child = topbarStore.findChild(source.childId)
+    if (child) {
+      parent = groupsStore.findTab(child.parentTabId)
+      openerId = child.id
+    }
+  }
+  if (!parent) {
+    // Unknown source: the page you're looking at
+    parent = groupsStore.activeTab
+    openerId = topbarStore.activeTopbarTabId
+  }
+  if (!parent) return
+  topbarStore.addChildTab(parent.id, parent.groupId, url, {
+    openerId,
+    activate: parent.id === groupsStore.activeTabId
+  })
+}
+
+// After closing the pop-up you were on, give keyboard focus to the page now shown (like Chrome)
+watch(
+  () => topbarStore.activeTopbarTabId,
+  (now, before) => {
+    if (before && before !== now && !topbarStore.findChild(before)) {
+      nextTick(() => getActiveWebview()?.focus())
+    }
+  }
+)
 
 function applyZoom(delta: number, reset = false): void {
   const wv = getActiveWebview()
@@ -137,10 +221,7 @@ function toggleSettings(): void {
 
 /** ⌘T adds a tab to the silo you're in (the rail's selected silo, else the active tab's). */
 function openAddTabForCurrentSilo(): void {
-  const target =
-    (uiStore.railSiloId && groupsStore.findGroup(uiStore.railSiloId)) ||
-    groupsStore.activeGroup ||
-    groupsStore.sortedGroups[0]
+  const target = groupsStore.currentGroup
   if (target) uiStore.openAddTabDialog(target.id)
 }
 
@@ -150,9 +231,77 @@ function openCommandBar(): void {
   uiStore.openCommandBar()
 }
 
+/** ⌘1–8: Nth tab of the current silo; ⌘9: its last tab (like Chrome). */
 function goToTab(index: number): void {
-  const tab = groupsStore.allTabsFlat[index]
-  if (tab) groupsStore.activateTab(tab.id)
+  const group = groupsStore.currentGroup
+  if (!group) return
+  const tabs = groupsStore.sortedTabsOf(group)
+  const tab = index >= 8 ? tabs[tabs.length - 1] : tabs[index]
+  if (tab) activateFromShortcut(tab.id)
+}
+
+/** ⌃1–9 (Alt+1–9 on Windows/Linux): Nth silo, back on the tab last used there. */
+function goToSilo(index: number): void {
+  const group = groupsStore.sortedGroups[index]
+  if (group) {
+    uiStore.closeSettingsPage()
+    groupsStore.openSilo(group.id)
+  }
+}
+
+/** Next / previous tab in the current silo, wrapping around. */
+function cycleTab(step: number): void {
+  const group = groupsStore.currentGroup
+  if (!group) return
+  const tabs = groupsStore.sortedTabsOf(group)
+  if (tabs.length === 0) return
+  const current = tabs.findIndex((t) => t.id === groupsStore.activeTabId)
+  const next =
+    current === -1 ? (step > 0 ? 0 : tabs.length - 1) : (current + step + tabs.length) % tabs.length
+  activateFromShortcut(tabs[next].id)
+}
+
+function activateFromShortcut(tabId: string): void {
+  if (!groupsStore.findTab(tabId)) return
+  groupsStore.activateTab(tabId)
+  uiStore.hideContextMenu()
+}
+
+function navigate(direction: 'back' | 'forward'): void {
+  navigateWebview(getActiveWebview(), direction)
+}
+
+function togglePageDevTools(): void {
+  const wv = getActiveWebview()
+  if (!wv) return
+  if (wv.isDevToolsOpened()) wv.closeDevTools()
+  else wv.openDevTools()
+}
+
+const activeIsLoading = computed(() => {
+  if (topbarStore.isChildActive) {
+    return !!topbarStore.findChild(topbarStore.activeTopbarTabId!)?.isLoading
+  }
+  return !!groupsStore.activeTab?.isLoading
+})
+
+function isTextField(el: Element | null): boolean {
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement ||
+    (el instanceof HTMLElement && el.isContentEditable)
+  )
+}
+
+const MOD_KEY = isMac ? 'Meta' : 'Control'
+
+function handleKeyup(e: KeyboardEvent): void {
+  if (e.key === MOD_KEY) uiStore.setModifierDown(false)
+}
+
+function handleBlur(): void {
+  uiStore.setModifierDown(false)
 }
 
 function handleCloseTab(): void {
@@ -170,7 +319,14 @@ function handleCloseTab(): void {
 // Fallback for when the app chrome (not a page) has focus. Shortcuts that also exist as menu
 // accelerators are handled by the menu first; the handlers are idempotent either way.
 function handleKeydown(e: KeyboardEvent): void {
-  const mod = e.metaKey || e.ctrlKey
+  // Holding ⌘ (Ctrl) shows the tab shortcut hints; any other key cancels them
+  if (e.key === MOD_KEY) {
+    if (!e.repeat) uiStore.setModifierDown(true)
+    return
+  }
+  uiStore.setModifierDown(false)
+
+  const mod = isMac ? e.metaKey : e.ctrlKey
 
   // Ctrl/Cmd+A — select all within the active page, not the whole app
   if (mod && e.key === 'a') {
@@ -179,6 +335,12 @@ function handleKeydown(e: KeyboardEvent): void {
       e.preventDefault()
       getActiveWebview()?.selectAll()
     }
+    return
+  }
+
+  if (mod && e.shiftKey && e.key.toLowerCase() === 't') {
+    e.preventDefault()
+    recentlyClosed.reopenLast()
     return
   }
 
@@ -224,9 +386,33 @@ function handleKeydown(e: KeyboardEvent): void {
     return
   }
 
-  if (mod && e.key >= '1' && e.key <= '9') {
+  // ⌃1–9 on macOS, Alt+1–9 elsewhere: go to silo N
+  const siloChord = isMac
+    ? e.ctrlKey && !e.metaKey && !e.altKey
+    : e.altKey && !e.ctrlKey && !e.metaKey
+  if (siloChord && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
     e.preventDefault()
-    goToTab(parseInt(e.key) - 1)
+    goToSilo(parseInt(e.code.slice(5)) - 1)
+    return
+  }
+
+  if (mod && !e.altKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
+    e.preventDefault()
+    goToTab(parseInt(e.code.slice(5)) - 1)
+    return
+  }
+
+  // Back / forward: ⌘← ⌘→ on macOS, Alt+← Alt+→ elsewhere (not while typing)
+  const navChord = isMac
+    ? e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey
+    : e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey
+  if (
+    navChord &&
+    (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+    !isTextField(document.activeElement)
+  ) {
+    e.preventDefault()
+    navigate(e.key === 'ArrowLeft' ? 'back' : 'forward')
     return
   }
 
@@ -240,9 +426,12 @@ function handleKeydown(e: KeyboardEvent): void {
     if (uiStore.editGroupDialogOpen) return uiStore.closeEditGroupDialog()
     if (uiStore.editTabDialogOpen) return uiStore.closeEditTabDialog()
     if (uiStore.confirmRemoveTabDialogOpen) return uiStore.closeConfirmRemoveTabDialog()
+    if (uiStore.confirmDeleteSiloId) return uiStore.closeConfirmDeleteSilo()
     if (uiStore.updateDialogOpen) return uiStore.closeUpdateDialog()
     if (uiStore.findBarOpen) return uiStore.closeFindBar()
     if (uiStore.settingsPageOpen) return uiStore.closeSettingsPage()
+    // Nothing else open: Esc stops a loading page, like Chrome
+    if (activeIsLoading.value) return getActiveWebview()?.stop()
   }
 }
 </script>
@@ -273,6 +462,7 @@ function handleKeydown(e: KeyboardEvent): void {
   <AddTabDialog v-if="uiStore.addTabDialogOpen" />
   <EditTabDialog v-if="uiStore.editTabDialogOpen" />
   <ConfirmRemoveTabDialog v-if="uiStore.confirmRemoveTabDialogOpen" />
+  <ConfirmDeleteSiloDialog v-if="uiStore.confirmDeleteSiloId" />
   <UpdateDialog v-if="uiStore.updateDialogOpen" />
   <DisplayMediaPickerDialog
     v-if="uiStore.displayMediaPick"
