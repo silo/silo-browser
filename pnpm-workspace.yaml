@@ -12,6 +12,4 @@ allowBuilds:
 # Exact-version exceptions (e.g. `- electron@45.2.3`) for a release that can't
 # wait. Remove each entry once that version is older than 24h; the weekly
 # update check does this.
-minimumReleaseAgeExclude:
-  # 45.3.1 (2026-11-12): cert distrust + notification leak fixes; remove after 2026-11-13 02:10 UTC
-  - electron@45.3.1
+minimumReleaseAgeExclude: []
