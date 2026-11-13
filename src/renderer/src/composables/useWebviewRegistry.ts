@@ -69,3 +69,28 @@ export function useWebviewRegistry() {
     findByWebContentsId
   }
 }
+
+/**
+ * Gives a page keyboard focus, like Chrome does when you switch or add a tab, unless something in
+ * the app chrome is using it: a dialog, menu or the command bar, or a text field (find bar,
+ * settings).
+ */
+export function focusPage(wv: Electron.WebviewTag | null): void {
+  if (!wv) return
+  const el = document.activeElement
+  if (el instanceof HTMLElement && el !== document.body && el !== wv) {
+    if (el.closest('[role="dialog"], [role="menu"]')) return
+    if (
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement ||
+      el.isContentEditable
+    ) {
+      return
+    }
+  }
+  // Coming from another page (e.g. ⌘2 pressed inside it): release it first. Otherwise Chromium
+  // keeps sending keys to that page's (now hidden) webContents.
+  if (el instanceof HTMLElement && el !== wv && el.tagName === 'WEBVIEW') el.blur()
+  wv.focus()
+}

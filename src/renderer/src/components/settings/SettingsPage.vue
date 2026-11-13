@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useSyncStore } from '@renderer/stores/sync'
+import { timeAgo } from '@renderer/utils/time'
 import { ACCENTS, DARK_SHADES, LIGHT_SHADES, TINTS, mixHex } from '@renderer/utils/theme'
-import { isMac, shortcut } from '@renderer/utils/platform'
+import { isMac, shiftShortcut, shortcut } from '@renderer/utils/platform'
 import type { SidebarLayout, TabItem, ThemeMode } from '@renderer/types'
 import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
 import ShortcutRecorder from '@renderer/components/inputs/ShortcutRecorder.vue'
@@ -16,9 +18,15 @@ import TabIcon from '@renderer/components/common/TabIcon.vue'
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
+const syncStore = useSyncStore()
 
 const appVersion = ref('')
 const checkingForUpdates = ref(false)
+
+// "synced 2 min ago" stays current while Settings is open
+const now = ref(Date.now())
+const clock = setInterval(() => (now.value = Date.now()), 30_000)
+onUnmounted(() => clearInterval(clock))
 
 onMounted(async () => {
   appVersion.value = await window.api.getAppVersion()
@@ -71,8 +79,53 @@ const selectedRing = '0 0 0 2px var(--card), 0 0 0 4px var(--fg1)'
 
 // --- Silos ---
 
-function siloMeta(tabs: number, ua?: string): string {
-  return `${tabs} ${tabs === 1 ? 'tab' : 'tabs'} · ${ua ? 'custom user agent' : 'default user agent'}`
+function siloMeta(tabs: number, ua?: string, localOnly?: boolean): string {
+  const ua2 = ua ? 'custom user agent' : 'default user agent'
+  const meta = `${tabs} ${tabs === 1 ? 'tab' : 'tabs'} · ${ua2}`
+  return localOnly && syncStore.enabled ? `${meta} · only on ${here}` : meta
+}
+
+// --- Sync ---
+
+const here = isMac ? 'this Mac' : 'this computer'
+const sync = computed(() => syncStore.status)
+
+const syncHeadline = computed(() => {
+  const s = sync.value
+  if (!s?.enabled) return ''
+  return s.error ? s.error : `Syncing with ${s.label}`
+})
+
+const otherMachines = computed(() => sync.value?.machines.filter((m) => !m.isThis) ?? [])
+
+const machinesLine = computed(() => {
+  const others = otherMachines.value
+  if (others.length === 0) {
+    return 'No other computers yet: choose this folder in Silo on another computer.'
+  }
+  return `Also on ${others.map((m) => `${m.name} (${timeAgo(m.lastSeen, now.value)})`).join(', ')}.`
+})
+
+const headerSync = computed(() => {
+  const s = sync.value
+  if (!s?.enabled || s.error) return ''
+  return ` · synced with ${s.label} ${timeAgo(s.lastSyncAt, now.value)}`
+})
+
+// "Another computer removed Work, Personal. Remove them here too?"
+const removalText = computed(() => {
+  const r = sync.value?.pendingRemoval
+  if (!r) return ''
+  const what = r.silos.length ? r.silos.join(', ') : `${r.tabs} tabs`
+  return `Another computer removed ${what}. Remove ${r.silos.length + r.tabs === 1 ? 'it' : 'them'} here too?`
+})
+
+async function stopSyncing(): Promise<void> {
+  await syncStore.stop()
+}
+
+function openSyncFolder(): void {
+  window.api.syncOpenFolder()
 }
 
 // --- Backup & updates ---
@@ -108,8 +161,9 @@ function openWebsite(): void {
 
 // Keep in sync with the app menu (src/main/menu.ts) and RESERVED in utils/accelerator.ts
 const shortcuts = [
-  { label: 'New tab', keys: shortcut('T') },
-  { label: 'Reopen closed tab', keys: isMac ? '⇧⌘T' : 'Ctrl+Shift+T' },
+  { label: 'New tab, above the page', keys: shortcut('T') },
+  { label: 'Add tab to the sidebar', keys: shiftShortcut('N') },
+  { label: 'Reopen closed tab', keys: shiftShortcut('T') },
   { label: 'New silo', keys: shortcut('N') },
   { label: 'Close pop-up tab', keys: shortcut('W') },
   { label: 'Tab 1–8 in this silo', keys: shortcut('1–8') },
@@ -153,7 +207,7 @@ function setTabShortcut(tabId: string, accelerator: string): void {
             <h1 class="m-0 font-display text-[32px] leading-none font-bold tracking-[-0.03em]">
               Settings
             </h1>
-            <span class="text-[13px] text-fg2">Silo v{{ appVersion }}</span>
+            <span class="text-[13px] text-fg2">Silo v{{ appVersion }}{{ headerSync }}</span>
           </div>
           <button type="button" class="btn btn-outline ml-auto" @click="uiStore.closeSettingsPage()">
             Back to browser
@@ -454,7 +508,9 @@ function setTabShortcut(tabId: string, accelerator: string): void {
               <SiloTile :silo="s" :size="28" :radius="8" />
               <span class="flex min-w-0 flex-1 items-baseline gap-2">
                 <span class="truncate text-[13.5px] font-semibold">{{ s.name }}</span>
-                <span class="truncate text-[12px] text-fg2">{{ siloMeta(s.tabs.length, s.userAgent) }}</span>
+                <span class="truncate text-[12px] text-fg2">{{
+                  siloMeta(s.tabs.length, s.userAgent, s.localOnly)
+                }}</span>
               </span>
               <button
                 type="button"
@@ -470,14 +526,100 @@ function setTabShortcut(tabId: string, accelerator: string): void {
             </p>
           </section>
 
-          <!-- Backup & updates -->
+          <!-- Sync & backup -->
           <section
             aria-labelledby="h-backup"
             class="flex flex-col gap-3 rounded-2xl bg-card px-5 pt-[18px] pb-5 shadow-[0_0_0_1px_var(--card-line)]"
           >
             <h2 id="h-backup" class="m-0 font-display text-[17px] font-bold tracking-[-0.01em]">
-              Backup &amp; updates
+              Sync &amp; backup
             </h2>
+            <div class="flex flex-col gap-2 rounded-[10px] bg-field p-3">
+              <template v-if="sync?.enabled">
+                <span class="flex items-center gap-2 text-[13px] font-semibold" role="status">
+                  <span
+                    aria-hidden="true"
+                    class="h-[7px] w-[7px] shrink-0 rounded-full"
+                    :class="sync.error ? 'bg-danger' : 'bg-success'"
+                  />
+                  {{ syncHeadline }}
+                </span>
+                <span class="truncate font-mono text-[11px] text-fg2" :title="sync.folder ?? ''">
+                  {{ sync.folderDisplay }}
+                </span>
+                <span class="text-[12px] text-fg2">
+                  Last synced {{ timeAgo(sync.lastSyncAt, now) }}. {{ machinesLine }}
+                </span>
+                <span v-if="sync.newerVersion" class="text-[12px] text-danger">
+                  A newer version of Silo also syncs here. Update Silo to get everything it saves.
+                </span>
+                <div
+                  v-if="sync.pendingRemoval"
+                  class="flex flex-col gap-2 rounded-lg bg-card p-2.5 shadow-[inset_0_0_0_1px_var(--field-line)]"
+                >
+                  <span class="text-[12.5px] text-fg1">{{ removalText }}</span>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      class="btn btn-outline btn-sm bg-card"
+                      @click="syncStore.resolveRemoval(false)"
+                    >
+                      Keep them
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm text-danger"
+                      @click="syncStore.resolveRemoval(true)"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm bg-card"
+                    @click="syncStore.chooseFolder()"
+                  >
+                    Change folder…
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm bg-card"
+                    @click="syncStore.syncNow()"
+                  >
+                    Sync now
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" @click="openSyncFolder">
+                    Show folder
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" @click="stopSyncing">
+                    Stop syncing
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <span class="text-[13px] font-semibold">Sync between computers</span>
+                <span class="text-[12px] text-fg2">
+                  Keep the same silos, tabs and settings on all your computers. Choose a folder that
+                  syncs, like one in iCloud Drive, Dropbox, Google Drive or OneDrive. Logins stay on
+                  each computer.
+                </span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm bg-card"
+                    @click="syncStore.chooseFolder()"
+                  >
+                    <AppIcon name="folder-sync" :size="13" :stroke="2" />
+                    Choose folder…
+                  </button>
+                </div>
+              </template>
+              <span v-if="syncStore.error && !syncStore.setup" class="text-[12px] text-danger">
+                {{ syncStore.error }}
+              </span>
+            </div>
             <div class="flex flex-col gap-2 rounded-[10px] bg-field p-3">
               <span class="text-[13px] font-semibold">Configuration file</span>
               <span class="text-[12px] text-fg2">
@@ -491,6 +633,10 @@ function setTabShortcut(tabId: string, accelerator: string): void {
                 <button type="button" class="btn btn-outline btn-sm bg-card" @click="handleImport">
                   <AppIcon name="upload" :size="13" :stroke="2" />
                   Import…
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" @click="syncStore.openRestore()">
+                  <AppIcon name="history" :size="13" :stroke="2" />
+                  Restore…
                 </button>
               </div>
             </div>

@@ -90,8 +90,10 @@ function buildTemplate(withTabShortcuts: boolean): Electron.MenuItemConstructorO
     {
       label: 'File',
       submenu: [
+        // ⌘T: a new tab above the page (pop-up tab); ⇧⌘N: a new tab in the sidebar
         item('New Tab', `${mod}+T`, 'shortcut:new-tab'),
         item('Reopen Closed Tab', `${mod}+Shift+T`, 'shortcut:reopen-closed-tab'),
+        item('Add Tab to Sidebar…', `${mod}+Shift+N`, 'shortcut:add-sidebar-tab'),
         item('New Silo', `${mod}+N`, 'shortcut:new-group'),
         item('Open Location…', `${mod}+L`, 'shortcut:command-bar'),
         { type: 'separator' },

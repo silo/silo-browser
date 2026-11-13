@@ -42,7 +42,9 @@ export const ICONS = {
     'M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 21h8m-4-4v4M9 10l3-3 3 3m-3-3v6',
   keyboard:
     'M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm3 4h.01M11 9h.01M15 9h.01M7 13h.01M17 13h.01M8 16h8',
-  history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 2'
+  history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5m4-1v5l3 2',
+  'folder-sync':
+    'M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2zm5-7 2 2 4-4'
 } as const
 
 export type AppIconName = keyof typeof ICONS

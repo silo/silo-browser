@@ -5,6 +5,11 @@ export function shortcut(key: string): string {
   return isMac ? `⌘${key}` : `Ctrl+${key}`
 }
 
+/** "⇧⌘N" on macOS, "Ctrl+Shift+N" elsewhere. */
+export function shiftShortcut(key: string): string {
+  return isMac ? `⇧⌘${key}` : `Ctrl+Shift+${key}`
+}
+
 /** "⌥↵" on macOS, "Alt+↵" elsewhere. */
 export function altShortcut(key: string): string {
   return isMac ? `⌥${key}` : `Alt+${key}`

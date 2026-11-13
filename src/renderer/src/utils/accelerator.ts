@@ -156,6 +156,7 @@ function buildReserved(): Map<string, string> {
   const entries: [string, string][] = [
     [`${m}+T`, 'New tab'],
     [`${m}+Shift+T`, 'Reopen closed tab'],
+    [`${m}+Shift+N`, 'Add tab to sidebar'],
     [`${m}+N`, 'New silo'],
     [`${m}+W`, 'Close tab'],
     [`${m}+L`, 'Address & search'],

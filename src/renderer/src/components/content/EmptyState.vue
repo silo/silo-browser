@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
-import { shortcut } from '@renderer/utils/platform'
+import { shiftShortcut } from '@renderer/utils/platform'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
 
@@ -42,7 +42,7 @@ const hasAnyTabs = computed(() => groupsStore.allTabsFlat.length > 0)
       >
         <AppIcon name="plus" :size="13" :stroke="2.4" />
         Add tab to {{ silo.name }}
-        <kbd class="text-[10.5px] opacity-80">{{ shortcut('T') }}</kbd>
+        <kbd class="text-[10.5px] opacity-80">{{ shiftShortcut('N') }}</kbd>
       </button>
     </div>
   </div>

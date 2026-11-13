@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { readFileSync, existsSync } from 'fs'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, rename } from 'fs/promises'
 import { join, dirname } from 'path'
 
 export interface PersistedState {
@@ -152,14 +152,55 @@ export function getCachedState(): PersistedState {
   return cachedState
 }
 
-export async function saveState(partial: Partial<PersistedState>): Promise<void> {
+type SaveListener = (partial: Partial<PersistedState>) => void
+let saveListener: SaveListener | null = null
+
+/** Folder sync hears about every save (except its own, which pass `silent`). */
+export function setSaveListener(listener: SaveListener | null): void {
+  saveListener = listener
+}
+
+export async function saveState(
+  partial: Partial<PersistedState>,
+  opts: { silent?: boolean } = {}
+): Promise<void> {
   cachedState = { ...cachedState, ...partial }
-  const storePath = getStorePath()
-  try {
-    const dir = dirname(storePath)
-    await mkdir(dir, { recursive: true })
-    await writeFile(storePath, JSON.stringify(cachedState, null, 2))
-  } catch (err) {
-    console.error('Failed to save state:', err)
+  if (!opts.silent && saveListener) {
+    try {
+      saveListener(partial)
+    } catch (err) {
+      console.error('Save listener failed:', err)
+    }
   }
+  await persist()
+}
+
+// Writes are queued one at a time (two overlapping writes could interleave into broken JSON) and
+// go to a temp file that is then renamed over the config, so a crash never leaves half a file.
+// A write that's still waiting picks up every save made in the meantime.
+let writeQueued: Promise<void> | null = null
+let writeChain: Promise<void> = Promise.resolve()
+
+function persist(): Promise<void> {
+  if (writeQueued) return writeQueued
+  const next = writeChain.then(async () => {
+    writeQueued = null
+    const storePath = getStorePath()
+    const data = JSON.stringify(cachedState, null, 2)
+    try {
+      await mkdir(dirname(storePath), { recursive: true })
+      const tmp = `${storePath}.tmp`
+      await writeFile(tmp, data)
+      try {
+        await rename(tmp, storePath)
+      } catch {
+        await writeFile(storePath, data) // e.g. the file is locked on Windows
+      }
+    } catch (err) {
+      console.error('Failed to save state:', err)
+    }
+  })
+  writeQueued = next
+  writeChain = next
+  return next
 }

@@ -55,6 +55,8 @@ export interface GroupItem {
   isCollapsed: boolean
   tabs: TabItem[]
   userAgent?: string
+  /** Folder sync: keep this silo (and its tabs) on this computer only. Never synced itself. */
+  localOnly?: boolean
 }
 
 export interface ChildTab {

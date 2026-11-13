@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
 import type { GroupItem, MediaCapture, SiloIcon, TabItem } from '@renderer/types'
+import { applyPatchToGroups, type SyncPatch } from '../../../shared/sync-model'
 import { useTopbarTabsStore } from './topbar-tabs'
 import { useUiStore } from './ui'
 import { useRecentlyClosedStore, type ClosedTabSnapshot } from './recently-closed'
@@ -143,7 +144,7 @@ export const useGroupsStore = defineStore('groups', () => {
 
   function updateGroup(
     groupId: string,
-    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'icon' | 'userAgent'>>
+    updates: Partial<Pick<GroupItem, 'name' | 'color' | 'icon' | 'userAgent' | 'localOnly'>>
   ): void {
     const group = findGroup(groupId)
     if (group) {
@@ -418,6 +419,7 @@ export const useGroupsStore = defineStore('groups', () => {
           userAgent: rawGroup.userAgent,
           order: rawGroup.order,
           isCollapsed: rawGroup.isCollapsed,
+          localOnly: rawGroup.localOnly || undefined,
           tabs: rawGroup.tabs.map((t) => ({
             id: t.id,
             groupId: t.groupId,
@@ -448,6 +450,7 @@ export const useGroupsStore = defineStore('groups', () => {
       // Pre-rework silos stored an emoji in `iconEmoji`
       if (!group.icon && group.iconEmoji) group.icon = { kind: 'emoji', value: group.iconEmoji }
       delete group.iconEmoji
+      if (group.localOnly !== true) delete group.localOnly
       for (const tab of group.tabs) {
         tab.isAsleep = false
         tab.isLoaded = false
@@ -483,6 +486,68 @@ export const useGroupsStore = defineStore('groups', () => {
     loaded.value = true
     // Start sleep timer — checks every 60s for tabs that should be put to sleep
     startSleepTimer()
+  }
+
+  // --- Folder sync ---
+
+  /** Forgets a tab's runtime state when sync removes it or moves it to another silo. */
+  function detachTab(tabId: string): void {
+    useTopbarTabsStore().removeAllChildTabs(tabId)
+    if (activeTabId.value === tabId) activeTabId.value = null
+  }
+
+  /**
+   * Applies changes made on another computer (sent by the main process, which has already saved
+   * them). Open tabs are not reloaded: a changed home URL is used the next time the tab loads.
+   * Silos removed here keep their logins for 30 days (see src/main/sync).
+   */
+  function applySyncPatch(patch: SyncPatch): void {
+    const ui = useUiStore()
+    applyPatchToGroups<TabItem, GroupItem>(groups.value, patch, {
+      newGroup: (id, f) => ({
+        id,
+        name: f.name,
+        color: f.color,
+        icon: f.icon ?? undefined,
+        userAgent: f.userAgent ?? undefined,
+        order: f.order,
+        isCollapsed: false,
+        tabs: []
+      }),
+      newTab: (id, f) => ({
+        id,
+        groupId: f.groupId,
+        name: f.name,
+        url: f.url,
+        iconEmoji: f.iconEmoji ?? undefined,
+        order: f.order,
+        isLoaded: false,
+        notificationsEnabled: f.notificationsEnabled,
+        notificationCount: 0,
+        sleepAfterMinutes: f.sleepAfterMinutes,
+        isMuted: f.isMuted,
+        zoomLevel: 0,
+        userAgent: f.userAgent ?? undefined,
+        shortcut: f.shortcut ?? undefined,
+        lastActiveAt: Date.now()
+      }),
+      removingTab: (tab) => detachTab(tab.id),
+      removingGroup: (group) => {
+        for (const tab of group.tabs) detachTab(tab.id)
+        delete lastTabBySilo.value[group.id]
+        if (ui.railSiloId === group.id) ui.setRailSilo(null)
+      },
+      movedTab: (tab) => {
+        // Same as moving it yourself: pop-ups and page state belong to the old silo's session
+        detachTab(tab.id)
+        tab.currentUrl = undefined
+        tab.currentTitle = undefined
+        tab.notificationCount = 0
+        tab.isAudioPlaying = false
+        tab.capture = undefined
+      }
+    })
+    debouncedSave()
   }
 
   let sleepTimerInterval: ReturnType<typeof setInterval> | null = null
@@ -557,6 +622,7 @@ export const useGroupsStore = defineStore('groups', () => {
     setTabLoading,
     isTabBusy,
     setTabZoomLevel,
+    applySyncPatch,
     loadFromDisk
   }
 })

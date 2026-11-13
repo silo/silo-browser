@@ -33,6 +33,14 @@ Each silo keeps its own cookies, localStorage and session data — so you can ru
   </tr>
 </table>
 
+## Same setup on every computer
+
+**Sync through a folder you already have.** Choose a folder in iCloud Drive, Dropbox, Google Drive, OneDrive — or any folder that syncs — on each computer, and your silos, tabs and settings stay the same everywhere. No account, no server.
+
+- **Logins stay on each computer.** Cookies and site data are never synced; you sign in once per computer.
+- **Keep a silo on one computer.** Turn off *Sync to your other computers* for a silo (say, your bank on your personal laptop) and it never leaves that computer.
+- **Nothing gets lost.** Changes made on different computers at the same time are combined field by field. If another computer removes several silos at once, Silo asks before removing them here, and restore points let you go back to an earlier setup.
+
 ## Features
 
 <table>
@@ -78,6 +86,7 @@ Each silo keeps its own cookies, localStorage and session data — so you can ru
 | Two sidebar layouts | A silo rail with the selected silo's tabs, or every silo in one list. Both collapse to an icon-only column. |
 | Keyboard shortcuts | Quick access to common actions — new tab, new silo, reload, command bar, find in page, switch tabs, and more. |
 | Emoji tab icons | Override a tab's favicon with any emoji character. |
+| Folder sync | Keep silos, tabs and settings the same on all your computers through a folder that syncs (iCloud Drive, Dropbox, Google Drive, OneDrive, Syncthing, a network drive…). Logins never sync. Silos can stay on one computer only. Restore points let you go back. See [docs/sync.md](docs/sync.md). |
 | Import / export config | Save your full setup (silos, tabs, settings) to a JSON file and restore it anytime. Logins are never included. |
 | Themes | Light, dark, or match your system — then pick one of six light and six dark shades, an accent color, and how strongly the active silo tints the window. |
 | Auto-updater | The app checks for updates in the background and prompts you when a new version is ready. |

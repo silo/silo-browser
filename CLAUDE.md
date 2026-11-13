@@ -69,7 +69,11 @@ sign users out).
 - `src/main/menu.ts` — App menu + accelerators (each sends `shortcut:*` to the renderer), custom tab shortcuts, Ctrl+Tab handling
 - `src/preload/webview.ts` — Sandboxed webview preload: focus/dialog guards, external protocols, back/forward keys + mouse buttons, camera/mic relay
 - `src/preload/media-capture.ts` — Main-world getUserMedia/getDisplayMedia wrapper that reports camera/mic/screen use
-- `src/main/store.ts` — JSON file persistence; `normalizeState()` validates and migrates configs (startup + import)
+- `src/main/store.ts` — JSON file persistence (atomic, one write at a time); `normalizeState()` validates and migrates configs (startup + import)
+- `src/main/sync/engine.ts` — Folder sync engine (no Electron imports): merge, local-change detection, restore points. See `docs/sync.md`
+- `src/main/sync/index.ts` — Folder sync: Electron wiring, folder picker, `sync:*` IPC
+- `src/shared/sync-model.ts` — Folder sync data model (stamps, records, views, patches), shared by main and renderer
+- `src/shared/sync-types.ts` — Sync status / folder summary types for IPC
 - `src/main/ipc-handlers.ts` — All IPC handler registrations (store, shell, dialog, window)
 - `src/preload/index.ts` — contextBridge API (window.api)
 - `src/preload/index.d.ts` — TypeScript declarations for SiloApi
@@ -77,6 +81,7 @@ sign users out).
 - `src/renderer/src/stores/ui.ts` — UI state (sidebar + layout, dialogs, command bar, context menu, settings, theme)
 - `src/renderer/src/stores/topbar-tabs.ts` — Runtime-only store for child/topbar (pop-up) tabs
 - `src/renderer/src/stores/recently-closed.ts` — Runtime-only stack of closed pop-up tabs / removed sidebar tabs (⌘⇧T, ⌘L)
+- `src/renderer/src/stores/sync.ts` — Folder sync UI state; applies `sync:patch` to the groups/ui stores
 - `src/renderer/src/utils/accelerator.ts` — Shortcut recording/formatting + the list of Silo's own (reserved) shortcuts
 - `src/renderer/src/types/index.ts` — Shared TypeScript interfaces
 - `src/renderer/src/utils/theme.ts` — Design tokens: shades, accents, silo colors, tint levels
@@ -93,8 +98,9 @@ sign users out).
 - `src/renderer/src/components/content/ChildWebviewContainer.vue` — Webview for child (topbar) tabs
 - `src/renderer/src/components/content/WelcomeScreen.vue` / `EmptyState.vue` — no silos / no open tab
 - `src/renderer/src/components/sidebar/TheSidebar.vue` — Picks `SidebarFull`, `SidebarRail`, `SidebarCollapsed` or `SettingsRail`
-- `src/renderer/src/components/dialogs/` — `SiloDialog` (new + edit silo), AddTab, EditTab, ConfirmRemoveTab, Update
-- `src/renderer/src/components/settings/SettingsPage.vue` — Settings cards (look & feel, behaviour, silos, backup, shortcuts)
+- `src/renderer/src/components/dialogs/` — `SiloDialog` (new + edit silo), AddTab, EditTab, ConfirmRemoveTab, Update,
+  `SyncSetupDialog` / `SyncRemovalDialog` / `SyncRestoreDialog`
+- `src/renderer/src/components/settings/SettingsPage.vue` — Settings cards (look & feel, behaviour, silos, sync & backup, shortcuts)
 
 ## Commands
 - `pnpm dev` — Start development with HMR
@@ -104,11 +110,16 @@ sign users out).
 - `pnpm build:linux` — Package for Linux
 - `pnpm sign:dev-electron` — (macOS) Sign `node_modules/electron/dist/Electron.app` with your local
   code-signing identity so notifications work in `pnpm dev`. Re-run after every Electron update.
+- `pnpm test:sync` — Folder sync tests (simulated computers + fuzz, `scripts/sync-test.ts`). Run after any change
+  to sync code, `store.ts` saves, or the silo/tab fields.
 
 ## Keyboard Shortcuts
 Most are app-menu accelerators (`src/main/menu.ts`) so they work while a page has focus. Keep the menu,
 `RESERVED` in `utils/accelerator.ts` and the list in `SettingsPage.vue` in sync.
-- `Cmd/Ctrl+T` — Add new tab to the current silo
+- `Cmd/Ctrl+T` — New tab above the page of the active sidebar tab (a pop-up tab): opens the command bar in
+  `'new-tab'` mode, which has no tab search: Enter always opens what you typed in a new tab, never switches to an
+  open tab that matches. In a silo with no open tab it adds a sidebar tab instead.
+- `Cmd/Ctrl+Shift+N` — Add a tab to the sidebar of the current silo (Add tab dialog)
 - `Cmd/Ctrl+Shift+T` — Reopen the last closed pop-up tab or removed sidebar tab (with its pop-ups)
 - `Cmd/Ctrl+N` — Create new silo
 - `Cmd/Ctrl+W` — Close active child tab (asks before removing a primary sidebar tab)
@@ -129,6 +140,8 @@ Most are app-menu accelerators (`src/main/menu.ts`) so they work while a page ha
 - `Cmd+Opt+I` / `Ctrl+Shift+I` — DevTools for the page; `+Shift` — Silo's own DevTools
 - `Cmd/Ctrl+,` — Open settings
 - `Escape` — Close the topmost layer (context menu, command bar, dialogs, find bar, settings), else stop loading
+- Switching, adding or closing a tab moves keyboard focus into the page now shown (`focusPage()` in
+  `useWebviewRegistry.ts`; App.vue watch + first `dom-ready`), unless a dialog, menu or text field has it.
 
 ## IPC Channels
 - `store:get-state` — Returns full AppState
@@ -146,11 +159,14 @@ Most are app-menu accelerators (`src/main/menu.ts`) so they work while a page ha
 - `dialog:export-config` — Export config to JSON file
 - `dialog:import-config` — Import config from JSON file
 - `menu:set-tab-shortcuts` — Custom tab shortcuts → hidden app-menu items
+- `sync:ready` / `sync:get-status` / `sync:choose-folder` / `sync:start` / `sync:stop` / `sync:resolve-removal` /
+  `sync:sync-now` / `sync:open-folder` / `sync:list-restore-points` / `sync:restore` — Folder sync (renderer → main)
+- `sync:status` / `sync:patch` — Folder sync status and changes from other computers (main → renderer)
 
 ## Conventions
 - Component names: `TheSidebar.vue` for singletons, `SidebarGroup.vue` for reusable
 - Pinia stores: Composition API style with `defineStore('name', () => {})`
-- IPC channels prefixed: `store:`, `shell:`, `dialog:`, `window:`, `menu:`; main → renderer menu accelerators use `shortcut:`
+- IPC channels prefixed: `store:`, `shell:`, `dialog:`, `window:`, `menu:`, `sync:`; main → renderer menu accelerators use `shortcut:`
 - UUID generation: `crypto.randomUUID()` (available in Electron's renderer)
 - Tailwind only in renderer (not main/preload)
 - Types shared via `src/renderer/src/types/index.ts`
@@ -172,6 +188,14 @@ Most are app-menu accelerators (`src/main/menu.ts`) so they work while a page ha
   - Pop-up tabs restored from the last session load when first shown (`ChildTab.isLoaded`, `loadedChildTabs`).
   - When a tab sleeps, its pop-ups are unloaded (`unloadChildTabs`), not deleted; they reload when clicked.
 - When deleting a group, call `session.fromPartition(partition).clearStorageData()`
+- Folder sync (`docs/sync.md`): each computer writes only `<folder>/Silo Browser/machines/<id>.json`; per-field
+  newest-stamp-wins merge. When adding a persisted silo/tab field or setting, decide whether it syncs: add it to
+  `SILO_KEYS` / `TAB_KEYS` / `SETTINGS_KEYS` in `src/shared/sync-model.ts` (and the view/stored helpers there),
+  or leave it per computer. Logins never sync. Silos with `localOnly` (and their tabs) never leave the computer.
+  The engine writes nothing while sync is off.
+- Sync's own writes to the state use `saveState(partial, { silent: true })` so they aren't mistaken for user edits.
+- A tab's `<webview>` loads `tab.url` once (`WebviewContainer`). Changing the home URL doesn't navigate an open page;
+  Edit tab calls `loadURL()` itself. Keep it that way: sync must never navigate a page away from what the user is doing.
 - Groups support optional `userAgent` field for custom user agent per group
 - Groups have an optional `icon: { kind: 'letter' | 'emoji' | 'icon' | 'image', value }`; uploaded logos are stored as data URLs in the config. Legacy `iconEmoji` is migrated on load.
 - `titleBarStyle: 'hidden'` on every platform. macOS traffic lights sit at (16, 16) — keep `TRAFFIC_LIGHT_INSET` in `utils/platform.ts` in sync. Windows/Linux use `titleBarOverlay`; the `.wco-spacer` element reserves room for the OS buttons.
@@ -256,7 +280,7 @@ A weekly Orca automation ("Weekly Electron & dependency check") follows this che
    - Open a PDF
    - Config export/import dialogs
    - Auto-update from the previous version
+   - Folder sync: rename a tab on one computer and see it on another (two profiles sharing a folder work too)
 
 ## Remaining Features (not yet implemented)
 - Split view (two tabs side by side)
-- Sync folder (iCloud Drive / Dropbox / Google Drive / OneDrive) — see `docs/ideas/sync-folder.md`

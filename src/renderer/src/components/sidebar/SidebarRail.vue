@@ -3,7 +3,7 @@ import { computed, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useSiloMenus } from '@renderer/composables/useSiloMenus'
-import { shortcut } from '@renderer/utils/platform'
+import { shiftShortcut, shortcut } from '@renderer/utils/platform'
 import type { GroupItem } from '@renderer/types'
 import SidebarRailSilo from './SidebarRailSilo.vue'
 import SidebarTab from './SidebarTab.vue'
@@ -154,7 +154,7 @@ function openOptions(e: MouseEvent): void {
             <AppIcon name="plus" :size="10" :stroke="3" />
           </span>
           <span class="flex-1">Add tab</span>
-          <kbd class="text-[10.5px]">{{ shortcut('T') }}</kbd>
+          <kbd class="text-[10.5px]">{{ shiftShortcut('N') }}</kbd>
         </button>
       </div>
     </aside>

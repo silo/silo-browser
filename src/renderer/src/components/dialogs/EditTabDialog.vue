@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { shortcut } from '@renderer/utils/platform'
 import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue'
 import ShortcutRecorder from '@renderer/components/inputs/ShortcutRecorder.vue'
@@ -11,6 +12,7 @@ import AppIcon from '@renderer/components/common/AppIcon.vue'
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
+const webviewRegistry = useWebviewRegistry()
 
 const name = ref('')
 const url = ref('')
@@ -57,7 +59,9 @@ function submit(): void {
     finalUrl = `https://${finalUrl}`
   }
 
-  groupsStore.updateTab(uiStore.editTabTargetId, {
+  const tabId = uiStore.editTabTargetId
+  const urlChanged = groupsStore.findTab(tabId)?.url !== finalUrl
+  groupsStore.updateTab(tabId, {
     name: trimmedName || trimmedUrl,
     url: finalUrl,
     iconEmoji: iconEmoji.value.trim() || undefined,
@@ -67,6 +71,13 @@ function submit(): void {
     userAgent: userAgent.value.trim() || undefined,
     shortcut: tabShortcut.value || undefined
   })
+  // An open tab goes to its new address (the webview only loads the home URL once by itself)
+  if (urlChanged) {
+    webviewRegistry
+      .getMain(tabId)
+      ?.loadURL(finalUrl)
+      .catch(() => {})
+  }
   close()
 }
 

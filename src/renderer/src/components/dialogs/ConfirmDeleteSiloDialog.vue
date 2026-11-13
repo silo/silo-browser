@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { useSyncStore } from '@renderer/stores/sync'
 import DialogShell from '@renderer/components/common/DialogShell.vue'
 import SiloTile from '@renderer/components/common/SiloTile.vue'
 
@@ -9,6 +10,7 @@ import SiloTile from '@renderer/components/common/SiloTile.vue'
 // Cancel has focus: Enter alone must not delete.
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
+const syncStore = useSyncStore()
 
 const silo = computed(() =>
   uiStore.confirmDeleteSiloId ? groupsStore.findGroup(uiStore.confirmDeleteSiloId) : null
@@ -17,6 +19,9 @@ const andTabs = computed(() => {
   const n = silo.value?.tabs.length ?? 0
   return n ? ` and its ${n} ${n === 1 ? 'tab' : 'tabs'}` : ''
 })
+
+// A synced silo is deleted on the user's other computers too
+const alsoElsewhere = computed(() => syncStore.enabled && !!silo.value && !silo.value.localOnly)
 
 function confirm(): void {
   if (silo.value) groupsStore.removeGroup(silo.value.id)
@@ -35,7 +40,10 @@ function close(): void {
       <p class="m-0 text-[13.5px] leading-[1.5] text-fg2">
         Delete <span class="font-semibold text-fg1">{{ silo.name }}</span
         >{{ andTabs }}? You'll be signed out of everything in it: its cookies and site data are
-        deleted. This can't be undone.
+        deleted.<template v-if="alsoElsewhere">
+          It's also removed from your other computers.</template
+        >
+        This can't be undone.
       </p>
     </div>
     <template #footer>

@@ -306,10 +306,13 @@ export const useUiStore = defineStore('ui', () => {
     else modifierHeld.value = false
   }
 
-  // --- Command bar (⌘L) ---
+  // --- Command bar (⌘L; ⌘T opens it to start a new tab) ---
   const commandBarOpen = ref(false)
-  function openCommandBar(): void {
+  /** 'address': edit the current address (⌘L). 'new-tab': open what you type in a new tab (⌘T). */
+  const commandBarMode = ref<'address' | 'new-tab'>('address')
+  function openCommandBar(mode: 'address' | 'new-tab' = 'address'): void {
     hideContextMenu()
+    commandBarMode.value = mode
     commandBarOpen.value = true
   }
   function closeCommandBar(): void {
@@ -347,6 +350,22 @@ export const useUiStore = defineStore('ui', () => {
   }
   function closeUpdateDialog(): void {
     updateDialogOpen.value = false
+  }
+
+  /** Settings changed on another computer (folder sync; the main process already saved them). */
+  function applySyncSettings(settings: Record<string, unknown>): void {
+    const s = settings
+    if (typeof s.openLinksInNewTab === 'boolean') openLinksInNewTab.value = s.openLinksInNewTab
+    if (typeof s.defaultSleepAfterMinutes === 'number')
+      defaultSleepAfterMinutes.value = s.defaultSleepAfterMinutes
+    if (typeof s.confirmCloseChildTabs === 'boolean')
+      confirmCloseChildTabs.value = s.confirmCloseChildTabs
+    if (typeof s.defaultUserAgent === 'string') defaultUserAgent.value = s.defaultUserAgent
+    if (typeof s.themeMode === 'string') themeMode.value = s.themeMode as ThemeMode
+    if (typeof s.accentColor === 'string') accentColor.value = s.accentColor as AccentColor
+    if (typeof s.lightShade === 'string') lightShade.value = s.lightShade as LightShade
+    if (typeof s.darkShade === 'string') darkShade.value = s.darkShade as DarkShade
+    if (typeof s.siloTint === 'string') siloTint.value = s.siloTint as SiloTint
   }
 
   async function loadFromDisk(preloaded?: unknown): Promise<void> {
@@ -433,6 +452,7 @@ export const useUiStore = defineStore('ui', () => {
     modifierHeld,
     setModifierDown,
     commandBarOpen,
+    commandBarMode,
     openCommandBar,
     closeCommandBar,
     settingsPageOpen,
@@ -460,6 +480,7 @@ export const useUiStore = defineStore('ui', () => {
     setDarkShade,
     setSiloTint,
     setTintPreviewColor,
+    applySyncSettings,
     loadFromDisk
   }
 })

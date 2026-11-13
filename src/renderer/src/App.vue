@@ -4,7 +4,12 @@ import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useRecentlyClosedStore } from '@renderer/stores/recently-closed'
-import { useWebviewRegistry, type WebviewTag } from '@renderer/composables/useWebviewRegistry'
+import { useSyncStore } from '@renderer/stores/sync'
+import {
+  focusPage,
+  useWebviewRegistry,
+  type WebviewTag
+} from '@renderer/composables/useWebviewRegistry'
 import { useAppTheme } from '@renderer/composables/useAppTheme'
 import { navigateWebview } from '@renderer/composables/usePageMessages'
 import { isMac } from '@renderer/utils/platform'
@@ -37,11 +42,21 @@ const DisplayMediaPickerDialog = defineAsyncComponent(
   () => import('@renderer/components/dialogs/DisplayMediaPickerDialog.vue')
 )
 const CommandBar = defineAsyncComponent(() => import('@renderer/components/CommandBar.vue'))
+const SyncSetupDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/SyncSetupDialog.vue')
+)
+const SyncRemovalDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/SyncRemovalDialog.vue')
+)
+const SyncRestoreDialog = defineAsyncComponent(
+  () => import('@renderer/components/dialogs/SyncRestoreDialog.vue')
+)
 
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
 const recentlyClosed = useRecentlyClosedStore()
+const syncStore = useSyncStore()
 const webviewRegistry = useWebviewRegistry()
 
 useAppTheme()
@@ -89,6 +104,9 @@ onMounted(async () => {
   await Promise.all([groupsStore.loadFromDisk(state), uiStore.loadFromDisk(state)])
   await topbarStore.loadFromDisk(state)
   window.api.setTabShortcuts(tabShortcuts.value)
+  // Folder sync: listen for changes from other computers, then tell main we're ready for them
+  await syncStore.init()
+  window.api.syncReady()
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('keyup', handleKeyup)
   window.addEventListener('blur', handleBlur)
@@ -107,7 +125,8 @@ onMounted(async () => {
 
   // Menu accelerators from the main process (these also fire while a page has focus)
   window.api.onCloseTab(() => handleCloseTab())
-  window.api.onNewTab(() => openAddTabForCurrentSilo())
+  window.api.onNewTab(() => openNewTab())
+  window.api.onAddSidebarTab(() => openAddTabForCurrentSilo())
   window.api.onNewGroup(() => uiStore.openAddGroupDialog())
   window.api.onCommandBar(() => openCommandBar())
   window.api.onGoToTab((index: number) => goToTab(index))
@@ -137,6 +156,7 @@ onUnmounted(() => {
   window.api.removeUpdaterUpToDateListener()
   window.api.removeCloseTabListener()
   window.api.removeNewTabListener()
+  window.api.removeAddSidebarTabListener()
   window.api.removeNewGroupListener()
   window.api.removeCommandBarListener()
   window.api.removeGoToTabListener()
@@ -158,6 +178,8 @@ onUnmounted(() => {
   window.api.removePrintListener()
   window.api.removeFindAgainListener()
   window.api.removePageDevToolsListener()
+  window.api.removeSyncStatusListener()
+  window.api.removeSyncPatchListener()
   window.removeEventListener('keyup', handleKeyup)
   window.removeEventListener('blur', handleBlur)
 })
@@ -196,14 +218,12 @@ function openPopup(url: string, sourceId?: number): void {
   })
 }
 
-// After closing the pop-up you were on, give keyboard focus to the page now shown (like Chrome)
+// Switching, adding or closing a tab gives keyboard focus to the page now shown (like Chrome), so
+// typing, Space and the arrow keys reach the page instead of the sidebar button you clicked. A
+// page that isn't created yet takes focus on its first dom-ready (WebviewContainer).
 watch(
-  () => topbarStore.activeTopbarTabId,
-  (now, before) => {
-    if (before && before !== now && !topbarStore.findChild(before)) {
-      nextTick(() => getActiveWebview()?.focus())
-    }
-  }
+  () => [groupsStore.activeTabId, topbarStore.activeTopbarTabId],
+  () => nextTick(() => focusPage(getActiveWebview()))
 )
 
 function applyZoom(delta: number, reset = false): void {
@@ -219,7 +239,18 @@ function toggleSettings(): void {
   else uiStore.openSettingsPage()
 }
 
-/** ⌘T adds a tab to the silo you're in (the rail's selected silo, else the active tab's). */
+/**
+ * ⌘T: a new tab above the page of the sidebar tab you're on (a pop-up tab), via the command bar.
+ * In a silo with no open tab there's nothing to open it in, so it adds a sidebar tab instead.
+ */
+function openNewTab(): void {
+  const silo = groupsStore.currentGroup
+  const parent = groupsStore.activeTab
+  if (silo && parent && parent.groupId === silo.id) uiStore.openCommandBar('new-tab')
+  else openAddTabForCurrentSilo()
+}
+
+/** ⇧⌘N adds a sidebar tab to the silo you're in (the rail's selected silo, else the active tab's). */
 function openAddTabForCurrentSilo(): void {
   const target = groupsStore.currentGroup
   if (target) uiStore.openAddTabDialog(target.id)
@@ -346,6 +377,12 @@ function handleKeydown(e: KeyboardEvent): void {
 
   if (mod && e.key === 't') {
     e.preventDefault()
+    openNewTab()
+    return
+  }
+
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+    e.preventDefault()
     openAddTabForCurrentSilo()
     return
   }
@@ -428,6 +465,9 @@ function handleKeydown(e: KeyboardEvent): void {
     if (uiStore.confirmRemoveTabDialogOpen) return uiStore.closeConfirmRemoveTabDialog()
     if (uiStore.confirmDeleteSiloId) return uiStore.closeConfirmDeleteSilo()
     if (uiStore.updateDialogOpen) return uiStore.closeUpdateDialog()
+    if (syncStore.setup) return syncStore.cancelSetup()
+    if (syncStore.restoreOpen) return void (syncStore.restoreOpen = false)
+    if (syncStore.showRemovalDialog) return void (syncStore.removalDismissed = true)
     if (uiStore.findBarOpen) return uiStore.closeFindBar()
     if (uiStore.settingsPageOpen) return uiStore.closeSettingsPage()
     // Nothing else open: Esc stops a loading page, like Chrome
@@ -468,4 +508,7 @@ function handleKeydown(e: KeyboardEvent): void {
     v-if="uiStore.displayMediaPick"
     :key="uiStore.displayMediaPick.requestId"
   />
+  <SyncSetupDialog v-if="syncStore.setup" />
+  <SyncRestoreDialog v-else-if="syncStore.restoreOpen" />
+  <SyncRemovalDialog v-else-if="syncStore.showRemovalDialog" />
 </template>

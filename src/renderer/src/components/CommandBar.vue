@@ -13,8 +13,10 @@ import TabIcon from '@renderer/components/common/TabIcon.vue'
 import type { AppIconName } from '@renderer/utils/icons'
 
 // ⌘L command bar (design board "C · Command bar"): search open tabs in every silo,
-// reopen recently closed tabs, open an address in the current tab, or add it as a new tab
-// to the current silo.
+// reopen recently closed tabs, open an address in the current tab, or add it as a sidebar tab
+// to the current silo. ⌘T opens it in 'new-tab' mode: no tab search, what you type always opens
+// in a new tab above the page of the sidebar tab you're on (a pop-up tab, with the silo's logins).
+// It must never switch to an open tab that happens to match (e.g. google.dk open elsewhere).
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
@@ -27,6 +29,9 @@ const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 
 const currentSilo = computed<GroupItem | null>(() => groupsStore.currentGroup)
+const newTabMode = computed(() => uiStore.commandBarMode === 'new-tab')
+/** The sidebar tab a new tab opens under (⌘T). */
+const parentTab = computed<TabItem | null>(() => groupsStore.activeTab)
 
 type Item =
   | { kind: 'tab'; id: string; tab: TabItem; silo: GroupItem; title: string; sub: string }
@@ -42,7 +47,7 @@ type Item =
       iconEmoji?: string
     }
   | {
-      kind: 'go' | 'add' | 'search'
+      kind: 'go' | 'add' | 'search' | 'new'
       id: string
       icon: AppIconName
       title: string
@@ -55,18 +60,18 @@ interface Section {
   items: Item[]
 }
 
-onMounted(() => {
-  // Start from the current address so it can be edited, like a browser's ⌘L
-  const tab = groupsStore.activeTab
-  const child = topbarStore.isChildActive
-    ? topbarStore.findChild(topbarStore.activeTopbarTabId!)
-    : null
-  query.value = child?.currentUrl || child?.url || tab?.currentUrl || tab?.url || ''
+function resetQuery(): void {
+  // ⌘L starts from the current address so it can be edited, like a browser's ⌘L; ⌘T starts empty
+  query.value = newTabMode.value ? '' : currentAddress.value
   nextTick(() => {
     inputRef.value?.focus()
     inputRef.value?.select()
   })
-})
+}
+
+onMounted(resetQuery)
+// ⌘T while ⌘L is open (or the other way round) switches mode
+watch(() => uiStore.commandBarMode, resetQuery)
 
 function hostOf(url: string): string {
   try {
@@ -101,10 +106,13 @@ const currentAddress = computed(() => {
   return child?.currentUrl || child?.url || tab?.currentUrl || tab?.url || ''
 })
 const searchText = computed(() =>
-  query.value.trim() === currentAddress.value ? '' : query.value.trim().toLowerCase()
+  !newTabMode.value && query.value.trim() === currentAddress.value
+    ? ''
+    : query.value.trim().toLowerCase()
 )
 
 const tabMatches = computed<Item[]>(() => {
+  if (newTabMode.value) return []
   const q = searchText.value
   const results: { item: Item; score: number }[] = []
   for (const silo of groupsStore.sortedGroups) {
@@ -141,6 +149,7 @@ const tabMatches = computed<Item[]>(() => {
 
 // Closed pop-up tabs and removed sidebar tabs that can still come back (⌘⇧T reopens the newest)
 const closedItems = computed<Item[]>(() => {
+  if (newTabMode.value) return []
   const q = searchText.value
   const out: Item[] = []
   for (const entry of recentlyClosed.restorable()) {
@@ -171,9 +180,20 @@ const goItems = computed<Item[]>(() => {
   if (!searchText.value) return []
   const url = asUrl(text)
   const silo = currentSilo.value
+  const parent = parentTab.value
+  const inNewTab = newTabMode.value && parent
   const items: Item[] = []
   if (url) {
-    if (groupsStore.activeTab) {
+    if (inNewTab) {
+      items.push({
+        kind: 'new',
+        id: 'new',
+        icon: 'globe',
+        title: hostOf(url),
+        sub: `New tab in ${parent.name}`,
+        url
+      })
+    } else if (parent) {
       items.push({ kind: 'go', id: 'go', icon: 'globe', title: hostOf(url), sub: 'Open in this tab', url })
     }
     if (silo) {
@@ -182,17 +202,17 @@ const goItems = computed<Item[]>(() => {
         id: 'add',
         icon: 'plus',
         title: `Add ${hostOf(url)} to ${silo.name}`,
-        sub: `New tab with ${silo.name}’s logins`,
+        sub: `Sidebar tab with ${silo.name}’s logins`,
         url
       })
     }
-  } else if (groupsStore.activeTab) {
+  } else if (parent) {
     items.push({
-      kind: 'search',
+      kind: inNewTab ? 'new' : 'search',
       id: 'search',
       icon: 'search',
       title: `Search for “${text}”`,
-      sub: 'Google, in this tab',
+      sub: inNewTab ? `Google, in a new tab in ${parent.name}` : 'Google, in this tab',
       url: `https://www.google.com/search?q=${encodeURIComponent(text)}`
     })
   }
@@ -209,16 +229,34 @@ const sections = computed<Section[]>(() => {
 
 const flat = computed(() => sections.value.flatMap((s) => s.items))
 
+const placeholder = computed(() =>
+  newTabMode.value ? 'Enter an address or search' : 'Search tabs or enter an address'
+)
+const emptyText = computed(() =>
+  newTabMode.value
+    ? 'Type an address or a search. It opens in a new tab.'
+    : 'No tabs match. Type an address to open it.'
+)
+const footerText = computed(() =>
+  newTabMode.value ? `${shortcut('↵')} adds it to the sidebar` : 'Searches tabs in every silo'
+)
+const chipLabel = computed(() =>
+  newTabMode.value && parentTab.value
+    ? `New tab in ${parentTab.value.name}`
+    : `in ${currentSilo.value?.name ?? ''}`
+)
+
 watch(flat, () => {
   // Prefer the address action when the query looks like a URL nobody has open yet
   const firstGo = flat.value.findIndex(
-    (i) => i.kind === 'go' || i.kind === 'add' || i.kind === 'search'
+    (i) => i.kind === 'go' || i.kind === 'add' || i.kind === 'search' || i.kind === 'new'
   )
   const onlyWeakTabMatches = tabMatches.value.length === 0
   selected.value = onlyWeakTabMatches && firstGo >= 0 ? firstGo : 0
 })
 
 function keyHint(item: Item, index: number): string {
+  if (item.kind === 'new') return '↵'
   if (item.kind === 'go' || item.kind === 'search') return '⇧↵'
   if (item.kind === 'add') return shortcut('↵')
   return index === selected.value ? '↵' : ''
@@ -231,6 +269,15 @@ function close(): void {
 function openInThisTab(url: string): void {
   const wv = webviewRegistry.getActive(groupsStore.activeTabId, topbarStore.activeTopbarTabId)
   if (wv) wv.loadURL(url)
+  close()
+}
+
+/** ⌘T: opens the address in a new tab above the page of the sidebar tab you're on. */
+function openInNewTab(url: string): void {
+  const parent = parentTab.value
+  if (!parent) return
+  topbarStore.addChildTab(parent.id, parent.groupId, url)
+  uiStore.closeSettingsPage()
   close()
 }
 
@@ -255,6 +302,8 @@ function run(item: Item | undefined): void {
     close()
   } else if (item.kind === 'add') {
     addAsTab(item.url)
+  } else if (item.kind === 'new') {
+    openInNewTab(item.url)
   } else {
     openInThisTab(item.url)
   }
@@ -285,7 +334,8 @@ function onEnter(e: KeyboardEvent): void {
   }
   if (e.shiftKey) {
     const url = typedOrSearchUrl()
-    if (url && groupsStore.activeTab) openInThisTab(url)
+    if (url && newTabMode.value) openInNewTab(url)
+    else if (url && groupsStore.activeTab) openInThisTab(url)
     return
   }
   run(flat.value[selected.value])
@@ -329,8 +379,8 @@ function indexOf(item: Item): number {
             role="combobox"
             aria-expanded="true"
             aria-controls="command-results"
-            aria-label="Search tabs or enter an address"
-            placeholder="Search tabs or enter an address"
+            :aria-label="placeholder"
+            :placeholder="placeholder"
             spellcheck="false"
             autocomplete="off"
             class="h-full min-w-0 flex-1 border-0 bg-transparent text-[16px] text-fg1 caret-[var(--accent)] outline-none placeholder:text-fg3"
@@ -341,10 +391,10 @@ function indexOf(item: Item): number {
           />
           <span
             v-if="currentSilo"
-            class="flex h-[22px] shrink-0 items-center gap-[5px] rounded-md bg-accent pr-2 pl-[3px] font-display text-[11.5px] font-bold text-on-accent"
+            class="flex h-[22px] max-w-[220px] shrink-0 items-center gap-[5px] rounded-md bg-accent pr-2 pl-[3px] font-display text-[11.5px] font-bold text-on-accent"
           >
             <SiloTile :silo="currentSilo" :size="16" :radius="4" />
-            in {{ currentSilo.name }}
+            <span class="truncate">{{ chipLabel }}</span>
           </span>
           <kbd
             class="inline-flex h-5 shrink-0 items-center rounded-[5px] px-1.5 text-[10.5px] text-fg3 shadow-[inset_0_0_0_1px_var(--line)]"
@@ -424,7 +474,7 @@ function indexOf(item: Item): number {
             </button>
           </div>
           <p v-if="sections.length === 0" class="m-0 px-2.5 py-6 text-center text-[13px] text-fg3">
-            No tabs match. Type an address to open it.
+            {{ emptyText }}
           </p>
         </div>
 
@@ -436,7 +486,7 @@ function indexOf(item: Item): number {
           <span class="flex items-center gap-[5px]">
             <kbd class="text-[10.5px]">{{ altShortcut('↵') }}</kbd>Default browser
           </span>
-          <span class="ml-auto">Searches tabs in every silo</span>
+          <span class="ml-auto">{{ footerText }}</span>
         </div>
       </div>
     </div>

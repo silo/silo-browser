@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
-import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { focusPage, useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import { usePageMessages } from '@renderer/composables/usePageMessages'
 import type { TabItem } from '@renderer/types'
@@ -18,6 +18,9 @@ const { registerMain, unregisterMain } = useWebviewRegistry()
 const webviewRef = ref<Electron.WebviewTag | null>(null)
 
 const partition = computed(() => `persist:silo-group-${props.tab.groupId}`)
+// The home URL is loaded once. Changing it later (Edit tab navigates itself, folder sync doesn't)
+// must not navigate an open page away: a half-written message would be lost.
+const initialUrl = props.tab.url
 const webviewPreload = window.api.webviewPreloadPath
 
 const effectiveUserAgent = computed(() => {
@@ -121,9 +124,17 @@ function setNotifEnabled(enabled: boolean): void {
   wv.executeJavaScript(`window.__siloNotifEnabled = ${enabled}`).catch(() => {})
 }
 
+// A tab opened for the first time takes keyboard focus once its page is there (App.vue focuses
+// pages that already exist)
+let firstDomReady = true
+
 const handleDomReady = (() => {
   const wv = webviewRef.value
   if (!wv) return
+  if (firstDomReady) {
+    firstDomReady = false
+    if (props.isActive) focusPage(wv)
+  }
   const enabled = props.tab.notificationsEnabled
   wv.executeJavaScript(getNotificationInjectionScript(enabled, props.tab.id)).catch(() => {})
   if (props.tab.isMuted) wv.setAudioMuted(true)
@@ -207,7 +218,7 @@ onUnmounted(() => {
   >
     <webview
       ref="webviewRef"
-      :src="tab.url"
+      :src="initialUrl"
       :partition="partition"
       :preload="webviewPreload"
       :data-tab-id="tab.id"

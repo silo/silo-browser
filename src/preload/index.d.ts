@@ -1,5 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { AppState, DisplayMediaPickRequest, GroupItem } from '../renderer/src/types'
+import type { SyncPatch } from '../shared/sync-model'
+import type { FolderSummary, JoinMode, RestorePointInfo, SyncStatus } from '../shared/sync-types'
 
 export interface SiloApi {
   platform: string
@@ -72,6 +74,8 @@ export interface SiloApi {
   setTabShortcuts: (shortcuts: { tabId: string; accelerator: string }[]) => Promise<void>
   onActivateTab: (callback: (tabId: string) => void) => void
   removeActivateTabListener: () => void
+  onAddSidebarTab: (callback: () => void) => void
+  removeAddSidebarTabListener: () => void
   onReopenClosedTab: (callback: () => void) => void
   removeReopenClosedTabListener: () => void
   onGoToSilo: (callback: (index: number) => void) => void
@@ -90,6 +94,28 @@ export interface SiloApi {
   removeFindAgainListener: () => void
   onPageDevTools: (callback: () => void) => void
   removePageDevToolsListener: () => void
+
+  // Folder sync
+  syncReady: () => Promise<void>
+  syncGetStatus: () => Promise<SyncStatus | null>
+  /** Opens the folder picker. null = cancelled */
+  syncChooseFolder: () => Promise<
+    { ok: true; summary: FolderSummary } | { ok: false; error: string } | null
+  >
+  syncStart: (
+    mode: JoinMode,
+    localOnly: string[]
+  ) => Promise<{ ok: true; status: SyncStatus } | { ok: false; error: string }>
+  syncStop: () => Promise<SyncStatus | null>
+  syncResolveRemoval: (apply: boolean) => Promise<SyncStatus | null>
+  syncNow: () => Promise<SyncStatus | null>
+  syncOpenFolder: () => Promise<void>
+  syncListRestorePoints: () => Promise<RestorePointInfo[]>
+  syncRestore: (id: string) => Promise<boolean>
+  onSyncStatus: (callback: (status: SyncStatus) => void) => void
+  removeSyncStatusListener: () => void
+  onSyncPatch: (callback: (patch: SyncPatch) => void) => void
+  removeSyncPatchListener: () => void
 }
 
 declare global {

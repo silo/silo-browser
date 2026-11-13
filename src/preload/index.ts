@@ -195,6 +195,8 @@ const api = {
   onActivateTab: (callback: (tabId: string) => void): void =>
     listen('shortcut:activate-tab', callback),
   removeActivateTabListener: (): void => unlisten('shortcut:activate-tab'),
+  onAddSidebarTab: (callback: () => void): void => listen('shortcut:add-sidebar-tab', callback),
+  removeAddSidebarTabListener: (): void => unlisten('shortcut:add-sidebar-tab'),
   onReopenClosedTab: (callback: () => void): void => listen('shortcut:reopen-closed-tab', callback),
   removeReopenClosedTabListener: (): void => unlisten('shortcut:reopen-closed-tab'),
   onGoToSilo: (callback: (index: number) => void): void => listen('shortcut:go-to-silo', callback),
@@ -214,7 +216,25 @@ const api = {
     listen('shortcut:find-again', callback),
   removeFindAgainListener: (): void => unlisten('shortcut:find-again'),
   onPageDevTools: (callback: () => void): void => listen('shortcut:page-devtools', callback),
-  removePageDevToolsListener: (): void => unlisten('shortcut:page-devtools')
+  removePageDevToolsListener: (): void => unlisten('shortcut:page-devtools'),
+
+  // Folder sync (src/main/sync)
+  syncReady: (): Promise<void> => ipcRenderer.invoke('sync:ready'),
+  syncGetStatus: (): Promise<unknown> => ipcRenderer.invoke('sync:get-status'),
+  syncChooseFolder: (): Promise<unknown> => ipcRenderer.invoke('sync:choose-folder'),
+  syncStart: (mode: string, localOnly: string[]): Promise<unknown> =>
+    ipcRenderer.invoke('sync:start', mode, localOnly),
+  syncStop: (): Promise<unknown> => ipcRenderer.invoke('sync:stop'),
+  syncResolveRemoval: (apply: boolean): Promise<unknown> =>
+    ipcRenderer.invoke('sync:resolve-removal', apply),
+  syncNow: (): Promise<unknown> => ipcRenderer.invoke('sync:sync-now'),
+  syncOpenFolder: (): Promise<void> => ipcRenderer.invoke('sync:open-folder'),
+  syncListRestorePoints: (): Promise<unknown> => ipcRenderer.invoke('sync:list-restore-points'),
+  syncRestore: (id: string): Promise<boolean> => ipcRenderer.invoke('sync:restore', id),
+  onSyncStatus: (callback: (status: unknown) => void): void => listen('sync:status', callback),
+  removeSyncStatusListener: (): void => unlisten('sync:status'),
+  onSyncPatch: (callback: (patch: unknown) => void): void => listen('sync:patch', callback),
+  removeSyncPatchListener: (): void => unlisten('sync:patch')
 }
 
 if (process.contextIsolated) {

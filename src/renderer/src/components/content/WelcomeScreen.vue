@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
+import { useSyncStore } from '@renderer/stores/sync'
 import { SILO_COLORS } from '@renderer/utils/theme'
 import AppIcon from '@renderer/components/common/AppIcon.vue'
 import SiloLogo from '@renderer/components/common/SiloLogo.vue'
@@ -11,6 +12,7 @@ import SiloLogo from '@renderer/components/common/SiloLogo.vue'
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
 const topbarStore = useTopbarTabsStore()
+const syncStore = useSyncStore()
 
 const colors = SILO_COLORS.slice(0, 7)
 const color = ref(colors[0].hex)
@@ -122,7 +124,23 @@ const pillars = [
             <AppIcon name="upload" :size="14" :stroke="2" />
             Import a configuration
           </button>
+          <button
+            v-if="!syncStore.enabled"
+            type="button"
+            class="flex h-8 items-center gap-[7px] rounded-lg px-2 text-[13px] text-fg2 transition-colors hover:bg-hover hover:text-fg1"
+            @click="syncStore.chooseFolder()"
+          >
+            <AppIcon name="folder-sync" :size="14" :stroke="2" />
+            Use a sync folder
+          </button>
         </div>
+        <p v-if="syncStore.enabled" class="m-0 -mt-3 text-[12.5px] text-fg3">
+          Syncing with {{ syncStore.status?.label }}. Silos you create here appear on your other
+          computers.
+        </p>
+        <p v-if="syncStore.error && !syncStore.setup" class="m-0 -mt-3 text-[12.5px] text-danger">
+          {{ syncStore.error }}
+        </p>
       </div>
 
       <!-- Illustration: silos as pillars, each holding its own apps -->

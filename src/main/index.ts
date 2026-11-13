@@ -16,6 +16,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { handleTabCycleKey, installAppMenu, sendShortcut } from './menu'
 import { MEDIA_CAPTURE_SUBFRAME_SCRIPT } from '../preload/media-capture'
 import { initAutoUpdater } from './updater'
+import { attachSyncWindow, initSync } from './sync'
 import { getCachedState, loadState, saveState, LIGHT_SHADE_HEX, DARK_SHADE_HEX } from './store'
 import icon from '../../resources/icon.png?asset'
 
@@ -587,10 +588,13 @@ app.whenReady().then(() => {
 
   loadState()
   loadGrantedPermissions()
+  // Folder sync: applies changes from other computers to the state before the window loads it
+  initSync()
   const initialState = getCachedState()
   nativeTheme.themeSource = initialState.themeMode as 'dark' | 'light' | 'system'
   registerIpcHandlers()
   const mainWindow = createWindow()
+  attachSyncWindow(mainWindow)
   setTimeout(() => initAutoUpdater(mainWindow), 3000)
 
   // ── FOCUS GUARD ──
@@ -621,7 +625,7 @@ app.whenReady().then(() => {
   })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) attachSyncWindow(createWindow())
   })
 })
 

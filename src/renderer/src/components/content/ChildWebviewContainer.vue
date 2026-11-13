@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTopbarTabsStore } from '@renderer/stores/topbar-tabs'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
-import { useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
+import { focusPage, useWebviewRegistry } from '@renderer/composables/useWebviewRegistry'
 import { getNotificationInjectionScript } from '@renderer/utils/notification-injection'
 import { usePageMessages } from '@renderer/composables/usePageMessages'
 import type { ChildTab } from '@renderer/types'
@@ -120,9 +120,17 @@ function setNotifEnabled(enabled: boolean): void {
   wv.executeJavaScript(`window.__siloNotifEnabled = ${enabled}`).catch(() => {})
 }
 
+// A pop-up tab opened in front takes keyboard focus once its page is there (App.vue focuses
+// pages that already exist)
+let firstDomReady = true
+
 const handleDomReady = (() => {
   const wv = webviewRef.value
   if (!wv) return
+  if (firstDomReady) {
+    firstDomReady = false
+    if (props.isActive) focusPage(wv)
+  }
   const enabled = parentTab.value?.notificationsEnabled ?? true
   wv.executeJavaScript(getNotificationInjectionScript(enabled, props.childTab.parentTabId)).catch(() => {})
   if (parentTab.value?.isMuted) wv.setAudioMuted(true)

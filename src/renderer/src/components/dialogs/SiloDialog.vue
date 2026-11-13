@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { useGroupsStore } from '@renderer/stores/groups'
 import { useUiStore } from '@renderer/stores/ui'
+import { useSyncStore } from '@renderer/stores/sync'
+import { isMac } from '@renderer/utils/platform'
 import { SILO_COLORS } from '@renderer/utils/theme'
 import {
   QUICK_EMOJIS,
@@ -20,6 +22,7 @@ import UserAgentSelector from '@renderer/components/inputs/UserAgentSelector.vue
 // built-in icon or uploaded logo), color and user agent.
 const groupsStore = useGroupsStore()
 const uiStore = useUiStore()
+const syncStore = useSyncStore()
 
 const editing = computed(() =>
   uiStore.editGroupDialogOpen && uiStore.editGroupTargetId
@@ -31,6 +34,16 @@ const existing = editing.value
 const name = ref(existing?.name ?? '')
 const color = ref(existing?.color ?? SILO_COLORS[groupsStore.groups.length % SILO_COLORS.length].hex)
 const userAgent = ref(existing?.userAgent ?? '')
+// Folder sync: off = this silo and its tabs stay on this computer only
+const synced = ref(!existing?.localOnly)
+const here = isMac ? 'this Mac' : 'this computer'
+const syncHint = computed(() => {
+  if (!syncStore.enabled) return `When sync is on (Settings). Off keeps it on ${here} only.`
+  if (synced.value) return 'Its tabs and settings, never its logins'
+  return existing && !existing.localOnly
+    ? `Only on ${here}. Your other computers remove it.`
+    : `Only on ${here}`
+})
 const mode = ref<SiloIconKind>(existing?.icon?.kind ?? 'letter')
 // Each mode keeps its own value so switching tabs doesn't lose what you picked
 const values = ref<Record<SiloIconKind, string>>({
@@ -110,14 +123,21 @@ function submit(): void {
     name: trimmed,
     color: color.value,
     icon: icon.value,
-    userAgent: userAgent.value.trim() || undefined
+    userAgent: userAgent.value.trim() || undefined,
+    localOnly: synced.value ? undefined : true
   }
   if (editing.value) {
     groupsStore.updateGroup(editing.value.id, updates)
     close()
   } else {
     const group = groupsStore.addGroup(trimmed, color.value, icon.value)
-    if (updates.userAgent) groupsStore.updateGroup(group.id, { userAgent: updates.userAgent })
+    // Same tick as addGroup, so the silo is never saved (or synced) without these
+    if (updates.userAgent || updates.localOnly) {
+      groupsStore.updateGroup(group.id, {
+        userAgent: updates.userAgent,
+        localOnly: updates.localOnly
+      })
+    }
     close()
     uiStore.openAddTabDialog(group.id)
   }
@@ -361,6 +381,23 @@ function close(): void {
         <span class="text-[12.5px] text-fg3">Tabs in this silo can still override it</span>
       </span>
       <UserAgentSelector v-model="userAgent" default-label="Automatic" />
+    </div>
+
+    <div class="flex items-start gap-3.5">
+      <span class="flex flex-1 flex-col gap-[3px] pt-0.5">
+        <span id="silo-sync-label" class="text-[13.5px] font-semibold"
+          >Sync to your other computers</span
+        >
+        <span class="text-[12.5px] text-fg3">{{ syncHint }}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        class="switch mt-0.5"
+        aria-labelledby="silo-sync-label"
+        :aria-checked="synced"
+        @click="synced = !synced"
+      />
     </div>
 
     <template #footer>
